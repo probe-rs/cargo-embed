@@ -34,6 +34,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85bb70cc08ec97ca5450e6eba421deeea5f172c0fc61f78b5357b2a8e8be195f"
+
+[[package]]
 name = "async-std"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -560,9 +566,8 @@ dependencies = [
 
 [[package]]
 name = "gdb-server"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ffce3200725b5af32349da1053cbe6b1275356cbf0b7a0260c6af4f3d090465"
+version = "0.7.1"
+source = "git+https://github.com/probe-rs/probe-rs?branch=configurable-timeout#76b663e22c976fbf48c6f702a106795581f92956"
 dependencies = [
  "async-std",
  "futures",
@@ -981,10 +986,10 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "probe-rs"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61f2cac6b6ca08e56ee5c553c42d32c6932692d5982e0bdbc47fb8605614a16"
+version = "0.7.1"
+source = "git+https://github.com/probe-rs/probe-rs?branch=configurable-timeout#76b663e22c976fbf48c6f702a106795581f92956"
 dependencies = [
+ "anyhow",
  "base64",
  "bitfield",
  "derivative",
@@ -1011,8 +1016,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-rtt"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a7b2046174d1c8ae9e3773436b9a8ad99e09717e4b11a7723322da500367ff0"
+source = "git+https://github.com/probe-rs/probe-rs-rtt?branch=configurable-timeout#dd739b3781d56486c481ab48f41f731b1b2169ad"
 dependencies = [
  "probe-rs",
  "scroll",
@@ -1022,8 +1026,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-t2rust"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e0e2d177a33e8c8a46d98767fb01877f1c466826b9c25f88749f35140d0aae0"
+source = "git+https://github.com/probe-rs/probe-rs?branch=configurable-timeout#76b663e22c976fbf48c6f702a106795581f92956"
 dependencies = [
  "base64",
  "proc-macro2 1.0.12",
