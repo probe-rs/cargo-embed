@@ -3,7 +3,6 @@ use std::fmt;
 use super::DataFormat;
 use chrono::Local;
 use probe_rs_rtt::{DownChannel, UpChannel};
-use std::convert::TryInto;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ChannelConfig {
@@ -18,8 +17,7 @@ pub struct ChannelState {
     down_channel: Option<DownChannel>,
     name: String,
     messages: Vec<String>,
-    data: Vec<f32>,
-    leftovers: Vec<u8>,
+    data: Vec<u8>,
     last_line_done: bool,
     input: String,
     scroll_offset: usize,
@@ -53,7 +51,6 @@ impl ChannelState {
             rtt_buffer: RttBuffer([0u8; 1024]),
             show_timestamps,
             data: Vec::new(),
-            leftovers: Vec::new(),
         }
     }
 
@@ -65,7 +62,7 @@ impl ChannelState {
         &self.messages
     }
 
-    pub fn data(&self) -> &Vec<f32> {
+    pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
 
@@ -121,23 +118,6 @@ impl ChannelState {
         }
 
         match fmt {
-            DataFormat::BinaryLE => {
-                let mut leftovers = self.leftovers.clone();
-                leftovers.extend_from_slice(&self.rtt_buffer.0[..count]);
-
-                let num = leftovers.chunks_exact(4).fold(0, |sum, bytes| {
-                    //impossible to fail?
-                    let val = f32::from_le_bytes(bytes.try_into().unwrap());
-                    self.data.push(val);
-                    sum + 4
-                });
-
-                if leftovers.len() != num {
-                    self.leftovers = leftovers[num..].to_owned();
-                } else {
-                    self.leftovers = Vec::new();
-                }
-            }
             DataFormat::String => {
                 // First, convert the incoming bytes to UTF8.
                 let mut incoming = String::from_utf8_lossy(&self.rtt_buffer.0[..count]).to_string();
@@ -170,6 +150,9 @@ impl ChannelState {
                         self.scroll_offset += 1;
                     }
                 }
+            }
+            DataFormat::BinaryLE => {
+                self.data.extend_from_slice(&self.rtt_buffer.0[..count]);
             }
         }
     }
