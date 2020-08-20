@@ -3,6 +3,7 @@ mod error;
 mod helpers;
 mod logging;
 mod rttui;
+mod svd_viewer;
 
 use structopt;
 
@@ -396,9 +397,13 @@ fn main_try() -> Result<()> {
         }
     }
 
-    if config.gdb.enabled && config.rtt.enabled {
+    if [config.gdb.enabled, config.rtt.enabled, config.svd.enabled]
+        .iter()
+        .fold(0, |c, v| c + if *v { 1 } else { 0 })
+        > 1
+    {
         return Err(anyhow!(
-            "Unfortunately, at the moment, only GDB OR RTT are possible."
+            "Unfortunately, at the moment, only GDB OR RTT OR SVD are possible."
         ));
     }
 
@@ -479,6 +484,11 @@ fn main_try() -> Result<()> {
         }
         if let Some(error) = error {
             return Err(error);
+        }
+    } else if config.svd.enabled {
+        if let Err(e) = svd_viewer::run(Arc::new(Mutex::new(session))) {
+            logging::eprintln("During the execution of the SVD viewer an error was encountered:");
+            logging::eprintln(format!("{:?}", e));
         }
     }
 

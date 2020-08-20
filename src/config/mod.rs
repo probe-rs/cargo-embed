@@ -19,6 +19,7 @@ pub struct Config {
     pub probe: Probe,
     pub rtt: Rtt,
     pub gdb: Gdb,
+    pub svd: SvdView,
 }
 
 /// The probe config struct holding all the possible probe options.
@@ -80,6 +81,12 @@ pub struct Rtt {
 pub struct Gdb {
     pub enabled: bool,
     pub gdb_connection_string: Option<String>,
+}
+
+/// The svd-viewer config struct holding all the possible svd-viewer options.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SvdView {
+    pub enabled: bool,
 }
 
 impl Configs {
