@@ -17,6 +17,7 @@ pub enum Msg {
 pub struct Props {
     pub peripheral: Peripheral,
     pub watch: Callback<(u32, Option<Callback<u32>>)>,
+    pub collapsed: bool,
 }
 
 impl Component for PeripheralCard {
@@ -26,8 +27,8 @@ impl Component for PeripheralCard {
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         PeripheralCard {
             link,
+            collapsed: props.collapsed,
             props,
-            collapsed: true,
         }
     }
 
@@ -44,28 +45,48 @@ impl Component for PeripheralCard {
     }
 
     fn view(&self) -> Html {
-        html! {
-            <div class="card mt-1">
-                <div class="card-header">
-                    <div class="d-flex w-100 justify-content-between align-items-center">
-                        <h5 class="mb-1">{self.props.peripheral.display_name.as_ref().unwrap_or(&self.props.peripheral.name)}</h5>
-                        <span>{ format!("{:#08X?}", self.props.peripheral.base_address) }</span>
-                        <span>{ self.props.peripheral.description.as_deref().unwrap_or("") }</span>
-                        <small>{"3 days ago"}</small>
-                        <button type="button" class="btn btn-primary" onclick=self.link.callback(move |value| {
-                            Msg::Collapse
-                        })>{ "Show" }</button>
-                    </div>
-                </div>
-                <div class=("card-body", "collapse" , if self.collapsed { "" } else { "show" })>
+        html! { <>
+            <tr>
+                <td>
+                    <button type="button" class="m-0 p-0 btn btn-link" onclick=self.link.callback(move |value| {
+                        Msg::Collapse
+                    })>
+                        { if self.collapsed { html! {
+                            <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-caret-right-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12.14 8.753l-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z"/>
+                            </svg>
+                        } } else { html! {
+                            <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-caret-down-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                            </svg>
+                        } } }
+                    </button>
+                </td>
+                <td>
+                    <h5>{self.props.peripheral.display_name.as_ref().unwrap_or(&self.props.peripheral.name)}</h5>
+                </td>
+                <td>
+                    <span>{ format!("{:#08X?}", self.props.peripheral.base_address) }</span>
+                </td>
+                <td>
+                    <span>{ self.props.peripheral.description.as_deref().unwrap_or("") }</span>
+                </td>
+                <td>
+                    <small>{"3 days ago"}</small>
+                </td>
+            </tr>
+            <tr class=("collapse", if self.collapsed { "" } else { "show" })>
+                <td colspan=5>
+                    <table class="table">
                     { for self.props.peripheral.registers.iter().map(|register| html! { <RegisterElement
                         register={register}
                         watch=self.link.callback(move |value| {
                             Msg::Watch(value)
                         })
                     /> } ) }
-                </div>
-            </div>
-        }
+                    </table>
+                </td>
+            </tr>
+        </> }
     }
 }

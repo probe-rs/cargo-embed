@@ -1,5 +1,7 @@
 use std::ops::RangeInclusive;
-use svd_parser::FieldInfo;
+use svd_parser::BitRange;
+use svd_parser::EnumeratedValues;
+use svd_parser::Usage;
 use yew::{html, prelude::*, Component, ComponentLink, Html, ShouldRender};
 use yewtil::NeqAssign;
 
@@ -12,12 +14,17 @@ pub enum Msg {}
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
-    pub info: FieldInfo,
     #[prop_or_default]
     pub offset: u32,
     #[prop_or_default]
     pub index: Option<String>,
+    pub name: String,
+    #[prop_or_default]
+    pub address: Option<u32>,
     pub value: u32,
+    pub bit_range: BitRange,
+    #[prop_or_default]
+    pub enumerated_values: Vec<EnumeratedValues>,
 }
 
 impl Component for FieldElement {
@@ -40,28 +47,37 @@ impl Component for FieldElement {
     }
 
     fn view(&self) -> Html {
-        html! {
-            <div>
-                <div class="bg-secondary text-white p-1">
-                { if self.props.info.bit_range.msb() != self.props.info.bit_range.lsb() {
-                    html! {  <div class="d-flex justify-content-between">
-                        <div>{ &self.props.info.bit_range.msb() }</div>
-                        <div>{ &self.props.info.bit_range.lsb() }</div>
-                    </div> }
-                } else {
-                    html! {  <div class="d-flex justify-content-center">
-                        <div>{ &self.props.info.bit_range.lsb() }</div>
-                    </div> }
-                }}
-                </div>
-                <div class="p-1">
-                    // <div>{ &self.info.name }</div>
-                    <div class="text-center">{
-                        print_bits(self.props.value, self.props.info.bit_range.lsb()..=self.props.info.bit_range.msb())
-                    }</div>
-                </div>
-            </div>
+        if &self.props.name == "SENSE" {
+            log::info!("{:#?}", &self.props.enumerated_values);
         }
+        let value = if let Some(enumerated_values) =
+            self.props.enumerated_values.iter().find(|ev| {
+                ev.usage == None
+                    || ev.usage == Some(Usage::Read)
+                    || ev.usage == Some(Usage::ReadWrite)
+            }) {
+            html! { <select> { for enumerated_values.values.iter().map(|ev| html! { <option>
+                { &ev.name }
+            </option> }) } </select>}
+        } else {
+            html! { format!("{:#08X?}", self.props.value) }
+        };
+        html! { <>
+            <td>{ &self.props.name }</td>
+            <td>{ self.props.address.map_or_else(|| "".to_string(), |v| format!("{:#08X?}", v)) }</td>
+            <td>{ value }</td>
+            <td>
+                { for (self.props.bit_range.msb() + 1..31 + 1).rev().into_iter().map(|i| html! {
+                    <div class="border border-light m-1" style="width: 20px; height: 20px; float: left;"></div>
+                }) }
+                { for (self.props.bit_range.lsb()..self.props.bit_range.msb() + 1).rev().into_iter().map(|i| html! {
+                    <div class="border border-primary m-1 p-1" style="width: 20px; height: 20px; float: left; font-size: 10px;">{ i }</div>
+                }) }
+                { for (0..self.props.bit_range.lsb()).rev().into_iter().map(|i| html! {
+                    <div class="border border-light m-1" style="width: 20px; height: 20px; float: left;"></div>
+                }) }
+            </td>
+        </> }
     }
 }
 

@@ -221,14 +221,15 @@ impl Component for Model {
                     <div class="row mt-1">
                         <div class="col">
                             { if let Some(device) = &self.device {
-                                html! { <div class="list-group">
-                                    { for device.peripherals.iter().map(|peripheral| html! {<PeripheralCard
+                                html! { <table class="table mt-1">
+                                    { for device.peripherals.iter().enumerate().map(|(id, peripheral)| html! {<PeripheralCard
                                         peripheral={peripheral}
+                                        collapsed=(id==0)
                                         watch=self.link.callback(move |value| {
                                             Msg::Watch(value)
                                         })
                                     />}) }
-                                </div> }
+                                </table> }
                             } else { html! {}} }
                         </div>
                     </div>
