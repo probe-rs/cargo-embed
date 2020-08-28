@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "gdb-server"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#4942bb05549dce85a1efef2d72b483d3ed63dfc2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1104,7 +1104,7 @@ dependencies = [
 [[package]]
 name = "probe-rs"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#4942bb05549dce85a1efef2d72b483d3ed63dfc2"
 dependencies = [
  "anyhow",
  "base64",
@@ -1134,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-cli-util"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#4942bb05549dce85a1efef2d72b483d3ed63dfc2"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-t2rust"
 version = "0.6.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#4942bb05549dce85a1efef2d72b483d3ed63dfc2"
 dependencies = [
  "base64",
  "proc-macro2",
