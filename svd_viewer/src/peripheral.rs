@@ -10,13 +10,12 @@ pub struct PeripheralCard {
 
 pub enum Msg {
     Collapse,
-    Watch((u32, Option<Callback<u32>>)),
 }
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub peripheral: Peripheral,
-    pub watch: Callback<(u32, Option<Callback<u32>>)>,
+    pub watch: Callback<u32>,
     pub collapsed: bool,
 }
 
@@ -35,7 +34,6 @@ impl Component for PeripheralCard {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Collapse => self.collapsed = !self.collapsed,
-            Msg::Watch(address) => self.props.watch.emit(address),
         }
         true
     }
@@ -78,11 +76,10 @@ impl Component for PeripheralCard {
             <tr class=("collapse", if self.collapsed { "" } else { "show" })>
                 <td colspan=5>
                     <table class="table">
-                    { for self.props.peripheral.registers.iter().map(|register| html! { <RegisterElement
+                    { for self.props.peripheral.registers.iter().enumerate().map(|(i, register)| html! { <RegisterElement
+                        key=i
                         register={register}
-                        watch=self.link.callback(move |value| {
-                            Msg::Watch(value)
-                        })
+                        watch=&self.props.watch
                     /> } ) }
                     </table>
                 </td>

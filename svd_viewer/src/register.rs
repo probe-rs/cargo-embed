@@ -1,6 +1,4 @@
 use crate::{field::FieldElement, svd::Register};
-use svd_parser::svd::bitrange::BitRangeType;
-use svd_parser::BitRange;
 use svd_parser::Field;
 use yew::{html, prelude::*, Component, ComponentLink, Html, ShouldRender};
 use yewtil::NeqAssign;
@@ -8,19 +6,17 @@ use yewtil::NeqAssign;
 pub struct RegisterElement {
     link: ComponentLink<RegisterElement>,
     props: Props,
-    update: Callback<u32>,
     watching: bool,
 }
 
 pub enum Msg {
-    Updated(u32),
     Watch,
 }
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub register: Register,
-    pub watch: Callback<(u32, Option<Callback<u32>>)>,
+    pub watch: Callback<u32>,
 }
 
 impl Component for RegisterElement {
@@ -28,27 +24,21 @@ impl Component for RegisterElement {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let update = link.callback(move |value| Msg::Updated(value));
-
         RegisterElement {
             link,
             props,
-            update,
             watching: false,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::Updated(value) => self.props.register.value = value,
             Msg::Watch => {
-                self.props
-                    .watch
-                    .emit((self.props.register.address, Some(self.update.clone())));
+                self.props.watch.emit(self.props.register.address);
                 self.watching = !self.watching;
+                true
             }
         }
-        true
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
@@ -65,7 +55,7 @@ impl Component for RegisterElement {
                 />
                 <td>
                     <button
-                        class="btn btn-link"
+                        class="btn btn-link btn-watch"
                         type="button"
                         onclick=self.link.callback(move |_| {
                             Msg::Watch

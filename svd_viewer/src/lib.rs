@@ -28,7 +28,8 @@ pub struct Model {
     websocket_task: Option<WebSocketTask>,
     device: Option<Device>,
     poll_interval: usize,
-    watching_addresses: Vec<(u32, Option<Callback<u32>>)>,
+    watching_addresses: Vec<u32>,
+    watch: Callback<u32>,
 }
 
 pub enum WebsocketEvent {
@@ -43,7 +44,7 @@ pub enum Msg {
     UpdatePollInterval(usize),
     WebSocketData(Update),
     WebsocketEvent(WebsocketEvent),
-    Watch((u32, Option<Callback<u32>>)),
+    Watch(u32),
     None,
 }
 
@@ -63,6 +64,7 @@ impl Component for Model {
                 Msg::WebsocketEvent(WebsocketEvent::Lost)
             }
         });
+        let watch = link.callback(move |value| Msg::Watch(value));
 
         Model {
             link,
@@ -77,6 +79,7 @@ impl Component for Model {
                 .map(From::from),
             poll_interval: 1000,
             watching_addresses: vec![],
+            watch,
         }
     }
 
@@ -99,7 +102,6 @@ impl Component for Model {
             }
             Msg::UpdatePollInterval(ms) => self.poll_interval = ms,
             Msg::WebSocketData(data) => {
-                log::info!("{:?}", data);
                 match data {
                     Update::Registers(register_updates) => {
                         if let Some(device) = self.device.as_mut() {
@@ -108,6 +110,7 @@ impl Component for Model {
                                     for register in &mut peripheral.registers {
                                         if register.address == register_update.address {
                                             register.value = register_update.value;
+                                            return true;
                                         }
                                     }
                                 }
@@ -157,15 +160,10 @@ impl Component for Model {
                 }
             },
             Msg::Watch(address) => {
-                log::info!("WAQTCH");
+                log::info!("WATCH {}", address);
                 self.watching_addresses.push(address);
 
-                let command = Command::Watch(
-                    self.watching_addresses
-                        .iter()
-                        .map(|address| address.0)
-                        .collect(),
-                );
+                let command = Command::Watch(self.watching_addresses.clone());
                 let data = serde_json::to_string(&command).unwrap();
                 self.websocket_task.as_mut().unwrap().send(Ok(data));
             }
@@ -224,10 +222,8 @@ impl Component for Model {
                                 html! { <table class="table mt-1">
                                     { for device.peripherals.iter().enumerate().map(|(i, peripheral)| html! {<PeripheralCard
                                         peripheral={peripheral}
-                                        collapsed=(i!=0)
-                                        watch=self.link.callback(move |value| {
-                                            Msg::Watch(value)
-                                        })
+                                        collapsed=(i!=device.peripherals.len())
+                                        watch=&self.watch
                                     />}) }
                                 </table> }
                             } else { html! {}} }
