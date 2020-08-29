@@ -222,9 +222,9 @@ impl Component for Model {
                         <div class="col">
                             { if let Some(device) = &self.device {
                                 html! { <table class="table mt-1">
-                                    { for device.peripherals.iter().enumerate().map(|(id, peripheral)| html! {<PeripheralCard
+                                    { for device.peripherals.iter().enumerate().map(|(i, peripheral)| html! {<PeripheralCard
                                         peripheral={peripheral}
-                                        collapsed=(id==0)
+                                        collapsed=(i!=0)
                                         watch=self.link.callback(move |value| {
                                             Msg::Watch(value)
                                         })

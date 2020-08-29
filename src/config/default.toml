@@ -66,3 +66,5 @@ enabled = false
 # Whether or not a SVD viewer should be opened after flashing.
 # This is exclusive and cannot be used with RTT or GDB at the moment.
 enabled = false
+webserver = "127.0.0.1:3030"
+websocket_server = "127.0.0.1:3031"

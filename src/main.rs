@@ -486,7 +486,8 @@ fn main_try() -> Result<()> {
             return Err(error);
         }
     } else if config.svd.enabled {
-        if let Err(e) = svd_viewer::run(Arc::new(Mutex::new(session))) {
+        svd_viewer::server::run(&config);
+        if let Err(e) = svd_viewer::runner::run(Arc::new(Mutex::new(session)), &config) {
             logging::eprintln("During the execution of the SVD viewer an error was encountered:");
             logging::eprintln(format!("{:?}", e));
         }

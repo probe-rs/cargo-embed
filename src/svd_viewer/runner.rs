@@ -7,13 +7,14 @@ use std::{
 use probe_rs::{Error, MemoryInterface, Session};
 
 use super::updater::{Updater, UpdaterChannel, WebsocketUpdater};
+use crate::config::Config;
 
-pub fn run(session: Arc<Mutex<Session>>) -> Result<(), Error> {
+pub fn run(session: Arc<Mutex<Session>>, config: &Config) -> Result<(), Error> {
     let mut watch = Vec::new();
     let mut update_interval: u64 = 5000;
 
     let mut websockets: UpdaterChannel<Command, Update> =
-        WebsocketUpdater::new("localhost:3031").start();
+        WebsocketUpdater::new(&config.svd.websocket_server).start();
 
     let mut timestamp = std::time::Instant::now();
 

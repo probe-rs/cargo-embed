@@ -87,6 +87,8 @@ pub struct Gdb {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SvdView {
     pub enabled: bool,
+    pub webserver: String,
+    pub websocket_server: String,
 }
 
 impl Configs {

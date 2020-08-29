@@ -1,4 +1,3 @@
-mod runner;
+pub mod runner;
+pub mod server;
 mod updater;
-
-pub use runner::run;
