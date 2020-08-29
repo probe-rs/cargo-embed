@@ -61,7 +61,6 @@ impl Component for RegisterElement {
                 <FieldElement
                     name=self.props.register.name.clone()
                     value=self.props.register.value
-                    bit_range=BitRange { offset: 0, width: 32, range_type: BitRangeType::BitRange }
                     address=self.props.register.address
                 />
                 <td>
@@ -94,7 +93,7 @@ impl Component for RegisterElement {
                             <tr><FieldElement
                                 name=info.name.clone()
                                 value=self.props.register.value
-                                bit_range=info.bit_range
+                                bit_range=Some(info.bit_range)
                                 enumerated_values=info.enumerated_values.clone()
                             /></tr>
                         } }
@@ -104,7 +103,7 @@ impl Component for RegisterElement {
                                 offset={ dim.dim_increment * d }
                                 index={ dim.dim_index.as_ref().map(|i| i.get(d as usize).map(Clone::clone)).flatten() },
                                 value=self.props.register.value
-                                bit_range=info.bit_range
+                                bit_range=Some(info.bit_range)
                                 enumerated_values=info.enumerated_values.clone()
                             /></tr> }
                         }) },
