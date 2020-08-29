@@ -8,6 +8,7 @@ use yewtil::NeqAssign;
 pub struct FieldElement {
     _link: ComponentLink<FieldElement>,
     props: Props,
+    previous_value: u32,
 }
 
 pub enum Msg {}
@@ -36,6 +37,7 @@ impl Component for FieldElement {
         FieldElement {
             _link: link,
             props: props,
+            previous_value: 0,
         }
     }
 
@@ -45,7 +47,9 @@ impl Component for FieldElement {
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
         if self.props.neq_assign(props) {
-            if extract_value(self) != 0 {
+            let extracted = extract_value(self);
+            if extracted != self.previous_value {
+                self.previous_value = extracted;
                 return true;
             }
         }
