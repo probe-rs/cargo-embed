@@ -431,6 +431,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
+name = "either"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
+
+[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -624,7 +630,7 @@ dependencies = [
 [[package]]
 name = "gdb-server"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#ade1c15292f00d45c6ed181533e52ef056c3c9f6"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1089,7 +1095,7 @@ dependencies = [
 [[package]]
 name = "probe-rs"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#ade1c15292f00d45c6ed181533e52ef056c3c9f6"
 dependencies = [
  "anyhow",
  "base64",
@@ -1119,7 +1125,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-cli-util"
 version = "0.8.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#ade1c15292f00d45c6ed181533e52ef056c3c9f6"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1145,7 +1151,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-t2rust"
 version = "0.6.0"
-source = "git+https://github.com/probe-rs/probe-rs#79a91c1f5e11090a8344546e7b0db97f32963d98"
+source = "git+https://github.com/probe-rs/probe-rs#ade1c15292f00d45c6ed181533e52ef056c3c9f6"
 dependencies = [
  "base64",
  "proc-macro2",
