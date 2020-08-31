@@ -20,4 +20,5 @@ pub enum Update {
 pub enum Command {
     UpdateInterval(usize),
     Watch(Vec<u32>),
+    SetRegister(Register),
 }

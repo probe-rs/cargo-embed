@@ -17,7 +17,7 @@ use yew::{
     },
 };
 
-use interface::{Command, Update};
+use interface::{Command, Register, Update};
 use log::Level;
 use svd::Device;
 
@@ -30,6 +30,7 @@ pub struct Model {
     poll_interval: usize,
     watching_addresses: Vec<u32>,
     watch: Callback<u32>,
+    set: Callback<(u32, u32)>,
 }
 
 pub enum WebsocketEvent {
@@ -45,6 +46,7 @@ pub enum Msg {
     WebSocketData(Update),
     WebsocketEvent(WebsocketEvent),
     Watch(u32),
+    Set((u32, u32)),
     None,
 }
 
@@ -65,6 +67,7 @@ impl Component for Model {
             }
         });
         let watch = link.callback(move |value| Msg::Watch(value));
+        let set = link.callback(move |value| Msg::Set(value));
 
         Model {
             link,
@@ -80,6 +83,7 @@ impl Component for Model {
             poll_interval: 1000,
             watching_addresses: vec![],
             watch,
+            set,
         }
     }
 
@@ -167,7 +171,15 @@ impl Component for Model {
                 let data = serde_json::to_string(&command).unwrap();
                 self.websocket_task.as_mut().unwrap().send(Ok(data));
             }
-            _ => return false,
+            Msg::Set((address, value)) => {
+                log::info!("WRITE {}: {}", address, value);
+                self.watching_addresses.push(address);
+
+                let command = Command::SetRegister(Register { value, address });
+                let data = serde_json::to_string(&command).unwrap();
+                self.websocket_task.as_mut().unwrap().send(Ok(data));
+            }
+            Msg::None => return false,
         }
         true
     }
@@ -224,6 +236,7 @@ impl Component for Model {
                                         peripheral={peripheral}
                                         collapsed=(i!=device.peripherals.len())
                                         watch=&self.watch
+                                        set=&self.set
                                     />}) }
                                 </table> }
                             } else { html! {}} }

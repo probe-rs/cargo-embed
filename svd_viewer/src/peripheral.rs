@@ -16,6 +16,7 @@ pub enum Msg {
 pub struct Props {
     pub peripheral: Peripheral,
     pub watch: Callback<u32>,
+    pub set: Callback<(u32, u32)>,
     pub collapsed: bool,
 }
 
@@ -80,6 +81,7 @@ impl Component for PeripheralCard {
                         key=i
                         register={register}
                         watch=&self.props.watch
+                        set=&self.props.set
                     /> } ) }
                     </table>
                 </td>

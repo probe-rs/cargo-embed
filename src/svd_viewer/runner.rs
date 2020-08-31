@@ -34,6 +34,12 @@ pub fn run(session: Arc<Mutex<Session>>, config: &Config) -> Result<(), Error> {
                                 .map(|address| Register { address, value: 0 })
                                 .collect()
                         }
+                        Command::SetRegister(register) => {
+                            let mut session = session.lock().unwrap();
+
+                            let mut core = session.core(0)?;
+                            core.write_word_32(register.address, register.value)?;
+                        }
                     };
                 }
                 _ => (),

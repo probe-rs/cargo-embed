@@ -7,16 +7,19 @@ pub struct RegisterElement {
     link: ComponentLink<RegisterElement>,
     props: Props,
     watching: bool,
+    pub set: Callback<u32>,
 }
 
 pub enum Msg {
     Watch,
+    None,
 }
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub register: Register,
     pub watch: Callback<u32>,
+    pub set: Callback<(u32, u32)>,
 }
 
 impl Component for RegisterElement {
@@ -24,10 +27,16 @@ impl Component for RegisterElement {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let p = props.clone();
+        let set = link.callback(move |value| {
+            p.set.emit((p.register.address, value));
+            Msg::None
+        });
         RegisterElement {
             link,
             props,
             watching: false,
+            set,
         }
     }
 
@@ -38,6 +47,7 @@ impl Component for RegisterElement {
                 self.watching = !self.watching;
                 true
             }
+            Msg::None => false,
         }
     }
 
@@ -52,6 +62,7 @@ impl Component for RegisterElement {
                     name=self.props.register.name.clone()
                     value=self.props.register.value
                     address=self.props.register.address
+                    set=&self.set
                 />
                 <td>
                     <button
@@ -85,6 +96,7 @@ impl Component for RegisterElement {
                                 value=self.props.register.value
                                 bit_range=Some(info.bit_range)
                                 enumerated_values=info.enumerated_values.clone()
+                                set=&self.set
                             /></tr>
                         } }
                         Field::Array(info, dim) => html! { for (0..dim.dim).map(|d| {
@@ -95,6 +107,7 @@ impl Component for RegisterElement {
                                 value=self.props.register.value
                                 bit_range=Some(info.bit_range)
                                 enumerated_values=info.enumerated_values.clone()
+                                set=&self.set
                             /></tr> }
                         }) },
                     } ) }

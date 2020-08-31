@@ -9,9 +9,12 @@ pub struct FieldElement {
     _link: ComponentLink<FieldElement>,
     props: Props,
     previous_value: u32,
+    onchange: Callback<ChangeData>,
 }
 
-pub enum Msg {}
+pub enum Msg {
+    Change(ChangeData),
+}
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
@@ -27,6 +30,7 @@ pub struct Props {
     pub address: Option<u32>,
     #[prop_or_default]
     pub enumerated_values: Vec<EnumeratedValues>,
+    pub set: Callback<u32>,
 }
 
 impl Component for FieldElement {
@@ -34,14 +38,35 @@ impl Component for FieldElement {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let onchange = link.callback(move |value| Msg::Change(value));
+
         FieldElement {
             _link: link,
             props: props,
             previous_value: 0,
+            onchange,
         }
     }
 
-    fn update(&mut self, _msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        match msg {
+            Msg::Change(change_data) => {
+                log::info!("CHANGE");
+                if let ChangeData::Select(select_element) = change_data {
+                    log::info!("CHANGE");
+                    let value = select_element.value().parse::<u32>();
+                    if let Some(bit_range) = self.props.bit_range {
+                        let left_shift = 31 - bit_range.msb();
+                        let mask = (0xFFFFFFFFu32 << left_shift) >> (bit_range.lsb() + left_shift);
+                        log::info!("{:?}", value);
+
+                        self.props
+                            .set
+                            .emit((self.props.value & !mask) | (value.unwrap() << bit_range.lsb()))
+                    }
+                }
+            }
+        }
         false
     }
 
@@ -89,15 +114,18 @@ fn action_view(field: &FieldElement) -> VNode {
                     .enumerated_values
                     .iter()
                     .find(|ev| ev.usage == Some(Usage::Write));
-                if let (Some(read), Some(write)) = (read, write) {
+                if let (Some(read), Some(_write)) = (read, write) {
                     // if value == 1 {
                     //     html! { <button> { &read.values[0].name } </button> }
                     // } else {
                     //     html! { <button> { &read.values[0].name } </button> }
                     // }
 
-                    html! { <select>
-                        { for read.values.iter().map(|ev| html! { <option>
+                    html! { <select onchange=&field.onchange >
+                        { for read.values.iter().map(|ev| html! { <option
+                            selected=Some(value) == ev.value
+                            value=ev.value.unwrap_or(0)
+                        >
                             { &ev.name }
                         </option> }) }
                     </select> }
@@ -132,10 +160,10 @@ fn action_view(field: &FieldElement) -> VNode {
                     html! { format!("0x{:08X?}", value) }
                 }
                 Some(Usage::ReadWrite) | None => {
-                    html! { <select> {
+                    html! { <select onchange=&field.onchange > {
                         for enumerated_values.values.iter().map(|ev| html! { <option
                             selected=Some(value) == ev.value
-                            value=value
+                            value=ev.value.unwrap_or(0)
                         >
                             { &ev.name }
                         </option> })

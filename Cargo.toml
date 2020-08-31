@@ -17,27 +17,27 @@ probe-rs = { version = "0.8.0", git = "https://github.com/probe-rs/probe-rs" }
 gdb-server = { version = "0.8.0", git = "https://github.com/probe-rs/probe-rs"  }
 probe-rs-cli-util = { version = "0.8.0", git = "https://github.com/probe-rs/probe-rs" }
 
-structopt = "0.3.2"
+structopt = "0.3.17"
 indicatif = "0.15.0"
 env_logger = "0.7.1"
-log = { version = "0.4.0", features = ["serde"] }
+log = { version = "0.4.11", features = ["serde"] }
 lazy_static = "1.4.0"
 colored = "2.0.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.51" }
+serde = { version = "1.0.115", features = ["derive"] }
+serde_json = { version = "1.0.57" }
 config = { version = "0.10.1", features = ["toml", "json", "yaml"], default-features = false }
 probe-rs-rtt = { version = "0.3.0" }
-chrono = "0.4"
-crossterm = "0.17.0"
-derivative = "2.1.0"
-goblin = "0.2.0"
+chrono = "0.4.15"
+crossterm = "0.17.7"
+derivative = "2.1.1"
+goblin = "0.2.3"
 tui = { version = "0.9.0", default-features = false, features = ["crossterm"] }
-anyhow = "1.0.31"
+anyhow = "1.0.32"
 textwrap = "0.12.1"
-futures = "0.3.1"
-tokio = { version = "0.2", features = ["rt-core", "macros", "rt-threaded", "blocking"] }
-warp = "0.2.1"
-tungstenite = "0.10.0"
+futures = "0.3.5"
+tokio = { version = "0.2.22", features = ["rt-core", "macros", "rt-threaded", "blocking"] }
+warp = "0.2.5"
+tungstenite = "0.11.1"
 interface = { path = "interface/" }
 
 [patch.crates-io]
