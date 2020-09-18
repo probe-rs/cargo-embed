@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "gdb-server"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#45d254027ac2aa91d66d6939c7cb6c613e572a72"
+source = "git+https://github.com/probe-rs/probe-rs#2b5f7308937a696c07db72a3ab038a269d29b2bf"
 dependencies = [
  "anyhow",
  "async-std",
@@ -826,18 +826,6 @@ dependencies = [
  "crc32fast",
  "rle-decode-fast",
  "take_mut",
-]
-
-[[package]]
-name = "libftdi1-sys"
-version = "1.0.0-alpha3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b362baf5161887215d5c66fc697ff94528fba8d80518deab2fe3a75817c408e"
-dependencies = [
- "cfg-if",
- "libc",
- "pkg-config",
- "vcpkg",
 ]
 
 [[package]]
@@ -1095,7 +1083,7 @@ dependencies = [
 [[package]]
 name = "probe-rs"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#45d254027ac2aa91d66d6939c7cb6c613e572a72"
+source = "git+https://github.com/probe-rs/probe-rs#2b5f7308937a696c07db72a3ab038a269d29b2bf"
 dependencies = [
  "anyhow",
  "base64",
@@ -1109,7 +1097,6 @@ dependencies = [
  "jaylink",
  "jep106",
  "lazy_static",
- "libftdi1-sys",
  "log",
  "num-traits",
  "object",
@@ -1125,7 +1112,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-cli-util"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#45d254027ac2aa91d66d6939c7cb6c613e572a72"
+source = "git+https://github.com/probe-rs/probe-rs#2b5f7308937a696c07db72a3ab038a269d29b2bf"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1151,7 +1138,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-t2rust"
 version = "0.6.0"
-source = "git+https://github.com/probe-rs/probe-rs#45d254027ac2aa91d66d6939c7cb6c613e572a72"
+source = "git+https://github.com/probe-rs/probe-rs#2b5f7308937a696c07db72a3ab038a269d29b2bf"
 dependencies = [
  "base64",
  "proc-macro2",
