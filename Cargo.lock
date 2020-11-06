@@ -177,12 +177,14 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "bitvec"
-version = "0.17.4"
+version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41262f11d771fd4a61aa3ce019fca363b4b6c282fca9da2a31186d3965a47a5c"
+checksum = "a7ba35e9565969edb811639dbebfe34edc0368e472c5018474c8eb2543397f81"
 dependencies = [
- "either",
+ "funty",
  "radium",
+ "tap",
+ "wyz",
 ]
 
 [[package]]
@@ -345,7 +347,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b076e143e1d9538dde65da30f8481c2a6c44040edb8e02b9bf1351edb92ce3"
 dependencies = [
  "lazy_static",
- "nom",
+ "nom 5.1.2",
  "serde",
  "serde_json",
  "toml",
@@ -432,10 +434,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
-name = "either"
-version = "1.6.0"
+name = "dunce"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
+checksum = "b2641c4a7c0c4101df53ea572bffdc561c146f6c2eb09e4df02bc4811e3feeb4"
 
 [[package]]
 name = "encode_unicode"
@@ -508,6 +510,12 @@ dependencies = [
  "libc",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "funty"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ba62103ce691c2fd80fbae2213dfdda9ce60804973ac6b6e97de818ea7f52c8"
 
 [[package]]
 name = "futures"
@@ -631,7 +639,7 @@ dependencies = [
 [[package]]
 name = "gdb-server"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#7b33b4b42ea1de33c98cb2e46986217e7c86f515"
+source = "git+https://github.com/probe-rs/probe-rs#556308ce1132000dafd4d4e4a76343f411188f31"
 dependencies = [
  "anyhow",
  "async-std",
@@ -640,7 +648,7 @@ dependencies = [
  "hex",
  "log",
  "memchr",
- "nom",
+ "nom 6.0.0",
  "probe-rs",
 ]
 
@@ -952,6 +960,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4489ccc7d668957ddf64af7cd027c081728903afa6479d35da7e99bf5728f75f"
+dependencies = [
+ "bitvec",
+ "lexical-core",
+ "memchr",
+ "version_check",
+]
+
+[[package]]
 name = "ntapi"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1115,12 +1135,11 @@ dependencies = [
 [[package]]
 name = "probe-rs"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#7b33b4b42ea1de33c98cb2e46986217e7c86f515"
+source = "git+https://github.com/probe-rs/probe-rs#556308ce1132000dafd4d4e4a76343f411188f31"
 dependencies = [
  "anyhow",
  "base64",
  "bitfield",
- "bitvec",
  "enum-primitive-derive",
  "gimli",
  "goblin",
@@ -1144,11 +1163,12 @@ dependencies = [
 [[package]]
 name = "probe-rs-cli-util"
 version = "0.9.0"
-source = "git+https://github.com/probe-rs/probe-rs#7b33b4b42ea1de33c98cb2e46986217e7c86f515"
+source = "git+https://github.com/probe-rs/probe-rs#556308ce1132000dafd4d4e4a76343f411188f31"
 dependencies = [
  "anyhow",
  "cargo_metadata",
  "cargo_toml",
+ "dunce",
  "log",
  "probe-rs",
  "serde",
@@ -1170,7 +1190,7 @@ dependencies = [
 [[package]]
 name = "probe-rs-t2rust"
 version = "0.6.0"
-source = "git+https://github.com/probe-rs/probe-rs#7b33b4b42ea1de33c98cb2e46986217e7c86f515"
+source = "git+https://github.com/probe-rs/probe-rs#556308ce1132000dafd4d4e4a76343f411188f31"
 dependencies = [
  "base64",
  "proc-macro2",
@@ -1241,9 +1261,9 @@ dependencies = [
 
 [[package]]
 name = "radium"
-version = "0.3.0"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "def50a86306165861203e7f84ecffbbdfdea79f0e51039b33de1e952358c47ac"
+checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
 
 [[package]]
 name = "redox_syscall"
@@ -1494,6 +1514,12 @@ name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
+
+[[package]]
+name = "tap"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36474e732d1affd3a6ed582781b3683df3d0563714c59c39591e8ff707cf078e"
 
 [[package]]
 name = "tar"
@@ -1789,6 +1815,12 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "wyz"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 
 [[package]]
 name = "xattr"
