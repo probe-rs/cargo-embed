@@ -65,8 +65,6 @@ pub struct General {
 pub struct Rtt {
     pub enabled: bool,
     pub channels: Vec<ChannelConfig>,
-    /// Connection timeout in ms.
-    pub timeout: usize,
     /// Whether to show timestamps in RTTUI
     pub show_timestamps: bool,
     /// Whether to save rtt history buffer on exit to file named history.txt

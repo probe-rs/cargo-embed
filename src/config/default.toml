@@ -46,8 +46,6 @@ enabled = false
 channels = [
     # { up = 0, down = 0, name = "name", format = "String" }
 ]
-# The duration in ms for which the logger should retry to attach to RTT.
-timeout = 3000
 # Whether timestamps in the RTTUI are enabled
 show_timestamps = true
 # Whether to save rtt history buffer on exit.

@@ -113,22 +113,16 @@ impl ChannelState {
     /// Polls the RTT target for new data on the specified channel.
     ///
     /// Processes all the new data and adds it to the linebuffer of the respective channel.
-    pub fn poll_rtt(&mut self) {
+    pub fn poll_rtt(&mut self) -> Result<(), probe_rs_rtt::Error> {
         // TODO: Proper error handling.
         let count = if let Some(channel) = self.up_channel.as_mut() {
-            match channel.read(self.rtt_buffer.0.as_mut()) {
-                Ok(count) => count,
-                Err(err) => {
-                    eprintln!("\nError reading from RTT: {}", err);
-                    return;
-                }
-            }
+            channel.read(self.rtt_buffer.0.as_mut())?
         } else {
             0
         };
 
         if count == 0 {
-            return;
+            return Ok(());
         }
 
         match self.format {
@@ -169,6 +163,7 @@ impl ChannelState {
                 self.data.extend_from_slice(&self.rtt_buffer.0[..count]);
             }
         };
+        Ok(())
     }
 
     pub fn push_rtt(&mut self) {

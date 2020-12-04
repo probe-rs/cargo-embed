@@ -144,6 +144,7 @@ impl App {
         }
 
         log::warn!("No RTT header info was present in the ELF file. Does your firmware run RTT?");
+        log::info!("Make sure your target supports reading memory while a core is running. This might be impossible for some targets in sleep mode. For some targets there is option flags for this.");
         None
     }
 
@@ -412,10 +413,11 @@ impl App {
     }
 
     /// Polls the RTT target for new data on all channels.
-    pub fn poll_rtt(&mut self) {
+    pub fn poll_rtt(&mut self) -> Result<(), probe_rs_rtt::Error> {
         for channel in self.tabs.iter_mut() {
-            channel.poll_rtt();
+            channel.poll_rtt()?;
         }
+        Ok(())
     }
 
     pub fn push_rtt(&mut self) {

@@ -173,7 +173,7 @@ fn main_try() -> Result<()> {
 
     // Make sure we load the config given in the cli parameters.
     for cdp in &config.general.chip_descriptions {
-        probe_rs::config::registry::add_target_from_yaml(&Path::new(cdp))
+        probe_rs::config::add_target_from_yaml(&Path::new(cdp))
             .with_context(|| format!("failed to load the chip description from {}", cdp))?;
     }
 
@@ -182,6 +182,7 @@ fn main_try() -> Result<()> {
         std::process::exit(0);
     } else {
         opt.chip
+            .clone()
             .or_else(|| config.general.chip.clone())
             .map(|chip| chip.into())
             .unwrap_or(TargetSelector::Auto)
@@ -217,79 +218,11 @@ fn main_try() -> Result<()> {
         path.display()
     ));
 
-    // If we got a probe selector in the config, open the probe matching the selector if possible.
-    let mut probe = if let Some(selector) = opt.probe_selector {
-        Probe::open(selector)?
-    } else {
-        match (config.probe.usb_vid.as_ref(), config.probe.usb_pid.as_ref()) {
-            (Some(vid), Some(pid)) => {
-                let selector = DebugProbeSelector {
-                    vendor_id: u16::from_str_radix(vid, 16)?,
-                    product_id: u16::from_str_radix(pid, 16)?,
-                    serial_number: config.probe.serial.clone(),
-                };
-                // if two probes with the same VID:PID pair exist we just choose one
-                Probe::open(selector)?
-            }
-            _ => {
-                if config.probe.usb_vid.is_some() {
-                    log::warn!("USB VID ignored, because PID is not specified.");
-                }
-                if config.probe.usb_pid.is_some() {
-                    log::warn!("USB PID ignored, because VID is not specified.");
-                }
+    let probe = setup_probe(&config, &opt)?;
 
-                // Only automatically select a probe if there is only
-                // a single probe detected.
-                let list = Probe::list_all();
-                if list.len() > 1 {
-                    return Err(anyhow!("The following devices were found:\n \
-                                    {} \
-                                        \
-                                    Use '--probe VID:PID'\n \
-                                                            \
-                                    You can also set the [default.probe] config attribute \
-                                    (in your Embed.toml) to select which probe to use. \
-                                    For usage examples see https://github.com/probe-rs/cargo-embed/blob/master/src/config/default.toml .",
-                                    list.iter().enumerate().map(|(num, link)| format!("[{}]: {:?}\n", num, link)).collect::<String>()));
-                }
-                Probe::open(
-                    list.first()
-                        .map(|info| {
-                            METADATA.lock().unwrap().probe = Some(format!("{:?}", info.probe_type));
-                            info
-                        })
-                        .ok_or_else(|| anyhow!("No supported probe was found"))?,
-                )?
-            }
-        }
-    };
-
-    probe
-        .select_protocol(config.probe.protocol)
-        .context("failed to select protocol")?;
-
-    let protocol_speed = if let Some(speed) = config.probe.speed {
-        let actual_speed = probe.set_speed(speed).context("failed to set speed")?;
-
-        if actual_speed < speed {
-            log::warn!(
-                "Unable to use specified speed of {} kHz, actual speed used is {} kHz",
-                speed,
-                actual_speed
-            );
-        }
-
-        actual_speed
-    } else {
-        probe.speed_khz()
-    };
-
-    METADATA.lock().unwrap().speed = Some(format!("{:?}", protocol_speed));
-
-    log::info!("Protocol speed {} kHz", protocol_speed);
-
-    let mut session = probe.attach(chip).context("failed attaching to target")?;
+    let mut session = probe
+        .attach(chip.clone())
+        .context("failed attaching to target")?;
 
     if config.flashing.enabled {
         // Start timer.
@@ -470,6 +403,7 @@ fn main_try() -> Result<()> {
         ));
     }
 
+    let session = Arc::new(Mutex::new(session));
     if config.gdb.enabled {
         let gdb_connection_string = config
             .gdb
@@ -481,34 +415,25 @@ fn main_try() -> Result<()> {
             "Firing up GDB stub at {}.",
             gdb_connection_string.as_ref().unwrap(),
         ));
-        if let Err(e) = probe_rs_gdb_server::run(gdb_connection_string, session) {
+        if let Err(e) = probe_rs_gdb_server::run(gdb_connection_string, &session) {
             logging::eprintln("During the execution of GDB an error was encountered:");
             logging::eprintln(format!("{:?}", e));
         }
     } else if config.rtt.enabled {
-        let session = Arc::new(Mutex::new(session));
-        let t = std::time::Instant::now();
-        let mut error = None;
-
-        let mut i = 1;
-
-        while (t.elapsed().as_millis() as usize) < config.rtt.timeout {
-            log::info!("Initializing RTT (attempt {})...", i);
-            i += 1;
-
-            let rtt_header_address = if let Ok(mut file) = File::open(path.as_path()) {
-                if let Some(address) = rttui::app::App::get_rtt_symbol(&mut file) {
-                    ScanRegion::Exact(address as u32)
-                } else {
-                    ScanRegion::Ram
-                }
+        let rtt_header_address = if let Ok(mut file) = File::open(path.as_path()) {
+            if let Some(address) = rttui::app::App::get_rtt_symbol(&mut file) {
+                ScanRegion::Exact(address as u32)
             } else {
                 ScanRegion::Ram
-            };
+            }
+        } else {
+            ScanRegion::Ram
+        };
 
+        loop {
             match Rtt::attach_region(session.clone(), &rtt_header_address) {
                 Ok(rtt) => {
-                    log::info!("RTT initialized.");
+                    log::info!("RTT block was found. Logging data ...");
 
                     // `App` puts the terminal into a special state, as required
                     // by the text-based UI. If a panic happens while the
@@ -530,23 +455,61 @@ fn main_try() -> Result<()> {
                     let logname = format!("{}_{}_{}", name, chip_name, Local::now().to_rfc3339());
                     let mut app = rttui::app::App::new(rtt, &config, logname)?;
                     loop {
-                        app.poll_rtt();
+                        match app.poll_rtt() {
+                            Ok(_) => (),
+                            Err(e) => {
+                                log::debug!("{}", e);
+                                log::warn!("An error during RTT polling was encountered. Trying to reconnect.");
+                                rttui::app::clean_up_terminal();
+                                loop {
+                                    match setup_probe(&config, &opt).and_then(|probe| {
+                                        probe.attach(chip.clone()).map_err(From::from)
+                                    }) {
+                                        Ok(s) => {
+                                            (*session.lock().unwrap()) = s;
+                                            break;
+                                        }
+                                        Err(e) => {
+                                            let first_line_prefix = "Error".red().bold();
+                                            let other_line_prefix: String = iter::repeat(" ")
+                                                .take(first_line_prefix.chars().count())
+                                                .collect();
+
+                                            let error = format!("{:?}", e);
+                                            for (i, line) in error.lines().enumerate() {
+                                                let _ = print!("       ");
+
+                                                if i == 0 {
+                                                    let _ = print!("{}", first_line_prefix);
+                                                } else {
+                                                    let _ = print!("{}", other_line_prefix);
+                                                };
+
+                                                let _ = println!(" {}", line);
+                                            }
+                                        }
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(10));
+                                }
+                                break;
+                            }
+                        }
                         app.render();
                         if app.handle_event() {
+                            rttui::app::clean_up_terminal();
                             logging::println("Shutting down.");
                             return Ok(());
                         };
+                        std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                 }
                 Err(err) => {
-                    error = Some(anyhow!("Error attaching to RTT: {}", err));
+                    log::warn!("Error finding the RTT block: {}", err);
+                    log::warn!("Retrying ...");
                 }
             };
 
-            log::debug!("Failed to initialize RTT. Retrying until timeout.");
-        }
-        if let Some(error) = error {
-            return Err(error);
+            log::debug!("Failed to initialize RTT. Retrying until the user stops.");
         }
     }
 
@@ -559,10 +522,86 @@ fn main_try() -> Result<()> {
     Ok(())
 }
 
+fn setup_probe(config: &config::Config, opt: &Opt) -> Result<Probe> {
+    // If we got a probe selector in the config, open the probe matching the selector if possible.
+    let mut probe = if let Some(selector) = opt.probe_selector.clone() {
+        Probe::open(selector)?
+    } else {
+        match (config.probe.usb_vid.as_ref(), config.probe.usb_pid.as_ref()) {
+            (Some(vid), Some(pid)) => {
+                let selector = DebugProbeSelector {
+                    vendor_id: u16::from_str_radix(vid, 16)?,
+                    product_id: u16::from_str_radix(pid, 16)?,
+                    serial_number: config.probe.serial.clone(),
+                };
+                // if two probes with the same VID:PID pair exist we just choose one
+                Probe::open(selector)?
+            }
+            _ => {
+                if config.probe.usb_vid.is_some() {
+                    log::warn!("USB VID ignored, because PID is not specified.");
+                }
+                if config.probe.usb_pid.is_some() {
+                    log::warn!("USB PID ignored, because VID is not specified.");
+                }
+
+                // Only automatically select a probe if there is only
+                // a single probe detected.
+                let list = Probe::list_all();
+                if list.len() > 1 {
+                    return Err(anyhow!("The following devices were found:\n \
+                                    {} \
+                                        \
+                                    Use '--probe VID:PID'\n \
+                                                            \
+                                    You can also set the [default.probe] config attribute \
+                                    (in your Embed.toml) to select which probe to use. \
+                                    For usage examples see https://github.com/probe-rs/cargo-embed/blob/master/src/config/default.toml .",
+                                    list.iter().enumerate().map(|(num, link)| format!("[{}]: {:?}\n", num, link)).collect::<String>()));
+                }
+                Probe::open(
+                    list.first()
+                        .map(|info| {
+                            METADATA.lock().unwrap().probe = Some(format!("{:?}", info.probe_type));
+                            info
+                        })
+                        .ok_or_else(|| anyhow!("No supported probe was found"))?,
+                )?
+            }
+        }
+    };
+
+    probe
+        .select_protocol(config.probe.protocol)
+        .context("failed to select protocol")?;
+
+    let protocol_speed = if let Some(speed) = config.probe.speed {
+        let actual_speed = probe.set_speed(speed).context("failed to set speed")?;
+
+        if actual_speed < speed {
+            log::warn!(
+                "Unable to use specified speed of {} kHz, actual speed used is {} kHz",
+                speed,
+                actual_speed
+            );
+        }
+
+        actual_speed
+    } else {
+        probe.speed_khz()
+    };
+
+    METADATA.lock().unwrap().speed = Some(format!("{:?}", protocol_speed));
+
+    log::info!("Protocol speed {} kHz", protocol_speed);
+
+    Ok(probe)
+}
+
 fn print_families() -> Result<()> {
     logging::println("Available chips:");
-    for family in probe_rs::config::registry::families()
-        .map_err(|e| anyhow!("Families could not be read: {:?}", e))?
+    for family in
+        probe_rs::config::families().map_err(|e| anyhow!("Families could not be read: {:?}", e))?
     {
         logging::println(&family.name);
         logging::println("    Variants:");
