@@ -140,9 +140,7 @@ impl Component for Model {
             }
             Msg::Search(term) => {
                 if let SvdLoadingState::Loaded(device) = &mut self.device {
-                    log::debug!("HEHE");
                     for peripheral in &mut device.peripherals {
-                        log::debug!("XD");
                         peripheral.show = peripheral.name.starts_with(&term);
 
                         let mut found_register = false;
@@ -168,7 +166,6 @@ impl Component for Model {
                             register.show |= found_field;
                         }
                         peripheral.show |= found_register;
-                        log::debug!("HEHE {}", peripheral.show);
                     }
                 }
             }
@@ -207,9 +204,6 @@ impl Component for Model {
                 }
                 WebsocketEvent::Opened => {
                     log::info!("Socket configuring.");
-                    let command = Command::UpdateInterval(self.poll_interval);
-                    let data = serde_json::to_string(&command).unwrap();
-                    self.websocket_task.as_mut().unwrap().send(Ok(data));
 
                     let command = Command::Watch(vec![]);
                     let data = serde_json::to_string(&command).unwrap();
@@ -273,7 +267,7 @@ impl Component for Model {
     fn view(&self) -> Html {
         html! {
             <>
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <nav class="navbar navbar-expand-lg fixed-top navbar-light bg-light">
                     <div class="container-fluid">
                         <ul class="navbar-nav mr-auto">
                             <li class="nav-item">
@@ -295,17 +289,20 @@ impl Component for Model {
                             <li>
                                 <button
                                     type="button"
-                                    class="btn btn-primary"
+                                    class="btn btn-link"
+                                    onclick=self.link.callback(|_| Msg::Halt)
                                 >
-                                    { if self.halted { html! {
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-circle-fill" viewBox="0 0 16 16">
-                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814l-3.5-2.5z"/>
-                                        </svg>
-                                    }} else { html! {
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-circle-fill" viewBox="0 0 16 16">
-                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.25 5C5.56 5 5 5.56 5 6.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C7.5 5.56 6.94 5 6.25 5zm3.5 0c-.69 0-1.25.56-1.25 1.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C11 5.56 10.44 5 9.75 5z"/>
-                                        </svg>
-                                    }}}
+                                    <h1>
+                                        { if self.halted { html! {
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-circle-fill" viewBox="0 0 16 16">
+                                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814l-3.5-2.5z"/>
+                                            </svg>
+                                        }} else { html! {
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-circle-fill" viewBox="0 0 16 16">
+                                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.25 5C5.56 5 5 5.56 5 6.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C7.5 5.56 6.94 5 6.25 5zm3.5 0c-.69 0-1.25.56-1.25 1.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C11 5.56 10.44 5 9.75 5z"/>
+                                            </svg>
+                                        }}}
+                                    </h1>
                                 </button>
                             </li>
 

@@ -12,12 +12,23 @@ h5 {
     padding: 4px;
 }
 
-#navbar {
-   height: 40px; 
+.navbar {
+   height: 80px;
+
+   & .bi {
+       height: 1em;
+       width: 1em;
+   }
 }
+
+.btn:focus {
+    outline: none !important;
+    box-shadow: none;
+  }
 
 .container-fluid.main {
     height: calc(100% - 40px - 2 * 8px - 4px);
+    margin-top: 80px;
 
     & .row {
         height: 100%;
