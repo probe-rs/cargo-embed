@@ -9,7 +9,6 @@ pub mod svd_loader;
 
 use anyhow::Context;
 use peripheral::PeripheralCard;
-use wasm_bindgen::prelude::*;
 use yew::{
     prelude::*,
     services::{
@@ -20,10 +19,8 @@ use yew::{
 };
 
 use interface::{Command, Register, Update};
-use log::Level;
 use serde::{Deserialize, Serialize};
 use svd::Device;
-use yewtil::future::LinkFuture;
 
 pub struct Model {
     link: ComponentLink<Model>,
@@ -122,7 +119,10 @@ impl Component for Model {
                     }
                 }
             }
-            Msg::SvdParsed(device) => self.device = device,
+            Msg::SvdParsed(device) => {
+                self.device = device;
+                log::debug!("HEREHEREHERE");
+            }
             Msg::Files(file) => {
                 let callback = self.link.callback(Msg::Loaded);
                 let task = self.reader.read_file(file, callback).unwrap();

@@ -1,11 +1,15 @@
-[tasks.build]
-command = "wasm-pack"
-args = ["build", "--dev", "--target", "web", "--out-name", "app", "--out-dir", "./static", "--", "--bin", "app"]
+[tasks.watch-app]
+script = '''
+cargo build --release --target wasm32-unknown-unknown --bin app
+wasm-bindgen --target web --no-typescript --out-name app target/wasm32-unknown-unknown/release/app.wasm --out-dir ./static
+'''
 watch = { ignore_pattern = "static/*" }
 
-[tasks.build-worker]
-command = "wasm-pack"
-args = ["build", "--dev", "--target", "no-modules", "--out-name", "worker", "--out-dir", "./static", "--", "--bin", "worker"]
+[tasks.watch-worker]
+script = '''
+cargo build --release --target wasm32-unknown-unknown --bin worker
+wasm-bindgen --target no-modules --no-typescript --out-name worker target/wasm32-unknown-unknown/release/worker.wasm --out-dir ./static
+'''
 watch = { ignore_pattern = "static/*" }
 
 [tasks.release]

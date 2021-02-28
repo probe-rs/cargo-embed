@@ -1,8 +1,5 @@
 use yew::{
-    services::{
-        reader::{FileData, ReaderTask},
-        ReaderService,
-    },
+    services::reader::FileData,
     worker::{Agent, AgentLink, HandlerId, Public},
 };
 
@@ -33,8 +30,7 @@ impl Agent for Worker {
     }
 
     fn handle_input(&mut self, msg: Self::Input, who: HandlerId) {
-        log::info!("Request: {:?}", msg);
-        let device_state = Self::parse_svd(&mut self.link, &msg);
+        let device_state = Self::parse_svd(&msg);
         self.link.respond(who, device_state);
     }
 
@@ -44,7 +40,7 @@ impl Agent for Worker {
 }
 
 impl Worker {
-    fn parse_svd(link: &mut AgentLink<Self>, svd: &str) -> DeviceState {
+    fn parse_svd(svd: &str) -> DeviceState {
         log::debug!("Start parsing ..");
         let device_state = svd_parser::parse(svd).map(From::from);
         let device_state = match device_state {
