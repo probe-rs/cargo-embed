@@ -62,16 +62,15 @@ impl Component for PeripheralCard {
                     </button>
                 </td>
                 <td>
-                    <h5>{self.props.peripheral.display_name.as_ref().unwrap_or(&self.props.peripheral.name)}</h5>
+                    {self.props.peripheral.display_name.as_ref().unwrap_or(&self.props.peripheral.name)}
                 </td>
                 <td>
-                    <span>{ format!("{:#08X?}", self.props.peripheral.base_address) }</span>
+                    { format!("{:#08X?}", self.props.peripheral.base_address) }
                 </td>
                 <td>
-                    <span>{ self.props.peripheral.description.as_deref().unwrap_or("") }</span>
+                    { self.props.peripheral.description.as_deref().unwrap_or("") }
                 </td>
                 <td>
-                    <small>{"3 days ago"}</small>
                 </td>
             </tr>
             {if !self.collapsed { html! {<tr>
@@ -85,10 +84,7 @@ impl Component for PeripheralCard {
                     /> } ) }
                     </table>
                 </td>
-            </tr> }} else { html! {<tr>
-                <td colspan=5>
-                </td>
-            </tr>}}}
+            </tr> }} else { html! {} }}
         </> }
     }
 }

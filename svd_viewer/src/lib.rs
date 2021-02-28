@@ -26,12 +26,14 @@ pub struct Model {
     reader_tasks: Vec<ReaderTask>,
     websocket_task: Option<WebSocketTask>,
     device: SvdLoadingState,
-    poll_interval: usize,
     watching_addresses: Vec<u32>,
     watch: Callback<u32>,
     set: Callback<(u32, u32)>,
     loader: Box<dyn yew::Bridge<svd_loader::Loader>>,
     halted: bool,
+    connected: bool,
+    host: String,
+    svd_filename: String,
 }
 
 /// Represents a new websocket event in any form.
@@ -68,6 +70,10 @@ impl Model {
         let data = serde_json::to_string(command).unwrap();
         self.websocket_task.as_mut().unwrap().send(Ok(data));
     }
+
+    fn host(host: &str) -> String {
+        format!("ws://{}/", host)
+    }
 }
 
 impl Component for Model {
@@ -95,30 +101,35 @@ impl Component for Model {
         let mut loader = svd_loader::Loader::bridge(callback);
         loader.send(crate::file::TEST_SVD.into());
 
+        let host: String = "localhost:3031".into();
+
         Model {
             link,
             reader_tasks: vec![],
             websocket_task: Some(
                 WebSocketService::connect_text(
-                    "ws://localhost:3031/",
+                    &Self::host(&host),
                     websocket_callback,
                     notification,
                 )
                 .unwrap(),
             ),
             device,
-            poll_interval: 1000,
             watching_addresses: vec![],
             watch,
             set,
             loader,
             halted: false,
+            connected: false,
+            host,
+            svd_filename: "nRF52840.svd".into(),
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::SvdFileDataLoaded(filedata) => {
+                self.svd_filename = filedata.name;
                 let xml = String::from_utf8(filedata.content)
                     .context("The SVD file appears to contain invalid UTF8 data.");
                 match xml {
@@ -208,6 +219,7 @@ impl Component for Model {
                     let command = Command::Watch(vec![]);
                     let data = serde_json::to_string(&command).unwrap();
                     self.websocket_task.as_mut().unwrap().send(Ok(data));
+                    self.connected = true;
                 }
                 WebsocketEvent::Lost => {
                     log::info!("Socket lost.");
@@ -224,12 +236,13 @@ impl Component for Model {
                     });
                     self.websocket_task = Some(
                         WebSocketService::connect_text(
-                            "ws://localhost:3031/",
+                            &Self::host(&self.host),
                             callback,
                             notification,
                         )
                         .unwrap(),
                     );
+                    self.connected = false;
                 }
             },
             Msg::Watch(address) => {
@@ -271,17 +284,6 @@ impl Component for Model {
                     <div class="container-fluid">
                         <ul class="navbar-nav mr-auto">
                             <li class="nav-item">
-                                <input type="file" onchange=self.link.callback(move |value| {
-                                    if let ChangeData::Files(files) = value {
-                                        if let Some(file) = files.get(0) {
-                                            Msg::UserSelectedFiles(file)
-                                        } else {
-                                            Msg::None
-                                        }
-                                    } else {
-                                        Msg::None
-                                    }
-                                })/>
                             </li>
                         </ul>
 
@@ -305,7 +307,6 @@ impl Component for Model {
                                     </h1>
                                 </button>
                             </li>
-
                         </ul>
 
                         <form class="my-2 my-lg-0 d-flex">
@@ -351,6 +352,51 @@ impl Component for Model {
                         </div>
                     </div>
                 </div>
+
+                <nav class="navbar navbar-expand-lg fixed-bottom navbar-light bg-light">
+                    <div class="container-fluid">
+                        <ul class="navbar-nav mr-auto">
+                            <li class="nav-item">
+                                { match self.device {
+                                    SvdLoadingState::Loaded(_) => { html! { &self.svd_filename }}
+                                    SvdLoadingState::Loading => { html! { "Loading SVD ..." } }
+                                    SvdLoadingState::Failed(_) => { html! { "Loading SVD failed!" } }
+                                } }
+
+                                <label for="file-upload" class="custom-file-upload btn btn-sm btn-outline-primary ms-2">
+                                    { "Select SVD" }
+                                </label>
+                                <input type="file" id="file-upload" onchange=self.link.callback(move |value| {
+                                    if let ChangeData::Files(files) = value {
+                                        if let Some(file) = files.get(0) {
+                                            Msg::UserSelectedFiles(file)
+                                        } else {
+                                            Msg::None
+                                        }
+                                    } else {
+                                        Msg::None
+                                    }
+                                })/>
+                            </li>
+                        </ul>
+
+                        <form class="my-2 my-lg-0 d-flex">
+                            { if self.connected { html! { <span class="text-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle me-2" viewBox="0 0 16 16">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
+                                </svg>
+                                { format!("Connected to {}", self.host) }
+                            </span> }} else { html! { <span class="text-danger">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle me-2" viewBox="0 0 16 16">
+                                    <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.146.146 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.163.163 0 0 1-.054.06.116.116 0 0 1-.066.017H1.146a.115.115 0 0 1-.066-.017.163.163 0 0 1-.054-.06.176.176 0 0 1 .002-.183L7.884 2.073a.147.147 0 0 1 .054-.057zm1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566z"/>
+                                    <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995z"/>
+                                </svg>
+                                { format!("Disconnected. Reconnecting ...") }
+                            </span> }}}
+                        </form>
+                    </div>
+                </nav>
             </>
         }
     }

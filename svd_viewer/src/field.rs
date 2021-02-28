@@ -51,14 +51,11 @@ impl Component for FieldElement {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Change(change_data) => {
-                log::info!("CHANGE");
                 if let ChangeData::Select(select_element) = change_data {
-                    log::info!("CHANGE");
                     let value = select_element.value().parse::<u32>();
                     if let Some(bit_range) = self.props.bit_range {
                         let left_shift = 31 - bit_range.msb();
                         let mask = (0xFFFFFFFFu32 << left_shift) >> (bit_range.lsb() + left_shift);
-                        log::info!("{:?}", value);
 
                         self.props
                             .set
@@ -115,12 +112,6 @@ fn action_view(field: &FieldElement) -> VNode {
                     .iter()
                     .find(|ev| ev.usage == Some(Usage::Write));
                 if let (Some(read), Some(_write)) = (read, write) {
-                    // if value == 1 {
-                    //     html! { <button> { &read.values[0].name } </button> }
-                    // } else {
-                    //     html! { <button> { &read.values[0].name } </button> }
-                    // }
-
                     html! { <select onchange=&field.onchange >
                         { for read.values.iter().map(|ev| html! { <option
                             selected=Some(value) == ev.value

@@ -13,18 +13,30 @@ h5 {
 }
 
 .navbar {
-   height: 80px;
+    height: 80px;
 
-   & .bi {
-       height: 1em;
-       width: 1em;
-   }
+    & .bi {
+        height: 1em;
+        width: 1em;
+    }
+
+    &.fixed-bottom {
+        height: 40px;
+
+        & input[type="file"] {
+            display: none;
+        }
+
+        & .custom-file-upload {
+            
+        }
+    }
 }
 
 .btn:focus {
     outline: none !important;
     box-shadow: none;
-  }
+}
 
 .container-fluid.main {
     height: calc(100% - 40px - 2 * 8px - 4px);
@@ -49,5 +61,5 @@ h5 {
 
 .btn-watch {
     margin: 0;
-    padding: 0;
+    padding: .25rem .5rem;
 }

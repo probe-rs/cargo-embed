@@ -67,7 +67,7 @@ impl Component for RegisterElement {
                     />
                     <td>
                         <button
-                            class="btn btn-outline-danger btn-watch"
+                            class="btn btn-outline-danger btn-watch btn-sm"
                             type="button"
                             onclick=self.link.callback(move |_| {
                                 Msg::Watch
@@ -111,10 +111,12 @@ impl Component for RegisterElement {
             </> }
         } else {
             html! { <tr>
-                <td colspan="4">{ &self.props.register.name }</td>
+                <td>{ &self.props.register.name }</td>
+                <td>{ format!("0x{:08X?}", &self.props.register.address) }</td>
+                <td colspan="2">{ &self.props.register.description.as_deref().unwrap_or("No Description") }</td>
                 <td>
                     <button
-                        class="btn btn-outline-primary btn-watch"
+                        class="btn btn-outline-primary btn-watch btn-sm"
                         type="button"
                         onclick=self.link.callback(move |_| {
                             Msg::Watch
