@@ -103,7 +103,7 @@ impl Component for RegisterElement {
                             html! { <tr><FieldElement
                                 name=info.name.clone()
                                 offset={ dim.dim_increment * d }
-                                index={ dim.dim_index.as_ref().map(|i| i.get(d as usize).map(Clone::clone)).flatten() },
+                                index={ dim.dim_index.as_ref().map(|i| i.get(d as usize).map(Clone::clone)).flatten() }
                                 value=self.props.register.value
                                 bit_range=Some(info.bit_range)
                                 enumerated_values=info.enumerated_values.clone()

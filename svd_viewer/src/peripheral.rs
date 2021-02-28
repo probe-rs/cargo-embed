@@ -47,7 +47,7 @@ impl Component for PeripheralCard {
         html! { <>
             <tr>
                 <td>
-                    <button type="button" class="m-0 p-0 btn btn-link" onclick=self.link.callback(move |value| {
+                    <button type="button" class="m-0 p-0 btn btn-link" onclick=self.link.callback(move |_value| {
                         Msg::Collapse
                     })>
                         { if self.collapsed { html! {

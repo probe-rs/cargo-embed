@@ -179,7 +179,7 @@ fn action_view(field: &FieldElement) -> VNode {
 fn display_bits(range: Range<u32>, value: u32, active: bool) -> VNode {
     html! { for range.rev().into_iter().map(|i| html! {
         <div
-            class=(
+            class=classes!(
                 "bit",
                 "border",
                 "m-1",

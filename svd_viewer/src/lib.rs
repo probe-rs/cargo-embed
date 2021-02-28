@@ -9,42 +9,42 @@ pub mod svd_loader;
 
 use anyhow::Context;
 use peripheral::PeripheralCard;
-use yew::{
-    prelude::*,
-    services::{
-        reader::{File, FileData, ReaderTask},
-        websocket::{WebSocketStatus, WebSocketTask},
-        ReaderService, WebSocketService,
-    },
-};
+use svd_loader::SvdLoadingState;
+use yew::{prelude::*, web_sys::File};
 
 use interface::{Command, Register, Update};
-use serde::{Deserialize, Serialize};
-use svd::Device;
+use yew_services::{
+    reader::{FileData, ReaderTask},
+    websocket::{WebSocketStatus, WebSocketTask},
+    ReaderService, WebSocketService,
+};
 
+/// This is the main component that represents our app.
+/// We mount it in app.rs but also need it in the Worker, which is why it's part of this library and not just the app.
 pub struct Model {
     link: ComponentLink<Model>,
-    reader: ReaderService,
     reader_tasks: Vec<ReaderTask>,
     websocket_task: Option<WebSocketTask>,
-    device: DeviceState,
+    device: SvdLoadingState,
     poll_interval: usize,
     watching_addresses: Vec<u32>,
     watch: Callback<u32>,
     set: Callback<(u32, u32)>,
-    loader: Box<dyn yew::Bridge<svd_loader::Worker>>,
+    loader: Box<dyn yew::Bridge<svd_loader::Loader>>,
 }
 
+/// Represents a new websocket event in any form.
 pub enum WebsocketEvent {
     SendData(Command),
     Opened,
     Lost,
 }
 
+/// The main message struct we use in our app.
 pub enum Msg {
-    Loaded(FileData),
-    SvdParsed(DeviceState),
-    Files(File),
+    SvdFileDataLoaded(FileData),
+    SvdParsingComplete(SvdLoadingState),
+    UserSelectedFiles(File),
     UpdatePollInterval(usize),
     WebSocketData(Update),
     WebsocketEvent(WebsocketEvent),
@@ -53,18 +53,11 @@ pub enum Msg {
     None,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum DeviceState {
-    Loading,
-    Loaded(Device),
-    Failed(String),
-}
-
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let websocket_callback = link.callback(|data: Result<String, anyhow::Error>| {
             let data = data.unwrap();
             let update = serde_json::from_str(&data).unwrap();
@@ -79,16 +72,14 @@ impl Component for Model {
         let watch = link.callback(move |value| Msg::Watch(value));
         let set = link.callback(move |value| Msg::Set(value));
 
-        let device = DeviceState::Loading;
+        let device = SvdLoadingState::Loading;
 
-        let callback = link.callback(|device| Msg::SvdParsed(device));
-        let mut loader = svd_loader::Worker::bridge(callback);
+        let callback = link.callback(|device| Msg::SvdParsingComplete(device));
+        let mut loader = svd_loader::Loader::bridge(callback);
         loader.send(crate::file::TEST_SVD.into());
-        log::debug!("AFTER");
 
         Model {
             link,
-            reader: ReaderService::new(),
             reader_tasks: vec![],
             websocket_task: Some(
                 WebSocketService::connect_text(
@@ -109,30 +100,31 @@ impl Component for Model {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::Loaded(filedata) => {
+            Msg::SvdFileDataLoaded(filedata) => {
                 let xml = String::from_utf8(filedata.content)
                     .context("The SVD file appears to contain invalid UTF8 data.");
                 match xml {
                     Ok(xml) => self.loader.send(xml),
                     Err(error) => {
-                        self.update(Msg::SvdParsed(DeviceState::Failed(error.to_string())));
+                        self.update(Msg::SvdParsingComplete(SvdLoadingState::Failed(
+                            error.to_string(),
+                        )));
                     }
                 }
             }
-            Msg::SvdParsed(device) => {
+            Msg::SvdParsingComplete(device) => {
                 self.device = device;
-                log::debug!("HEREHEREHERE");
             }
-            Msg::Files(file) => {
-                let callback = self.link.callback(Msg::Loaded);
-                let task = self.reader.read_file(file, callback).unwrap();
+            Msg::UserSelectedFiles(file) => {
+                let callback = self.link.callback(Msg::SvdFileDataLoaded);
+                let task = ReaderService::read_file(file, callback).unwrap();
                 self.reader_tasks.push(task);
             }
             Msg::UpdatePollInterval(ms) => self.poll_interval = ms,
             Msg::WebSocketData(data) => {
                 match data {
                     Update::Registers(register_updates) => {
-                        if let DeviceState::Loaded(device) = &mut self.device {
+                        if let SvdLoadingState::Loaded(device) = &mut self.device {
                             for register_update in register_updates.registers {
                                 for peripheral in &mut device.peripherals {
                                     for register in &mut peripheral.registers {
@@ -216,14 +208,13 @@ impl Component for Model {
         html! {
             <>
                 <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                    <a class="navbar-brand" href="#">{ "SVD Viewer" }</a>
                     <div class="collapse navbar-collapse" id="navbar">
                         <ul class="navbar-nav mr-auto">
                             <li class="nav-item">
                                 <input type="file" onchange=self.link.callback(move |value| {
                                     if let ChangeData::Files(files) = value {
                                         if let Some(file) = files.get(0) {
-                                            Msg::Files(file)
+                                            Msg::UserSelectedFiles(file)
                                         } else {
                                             Msg::None
                                         }
@@ -259,16 +250,16 @@ impl Component for Model {
                     <div class="row mt-1">
                         <div class="col d-flex align-items-center justify-content-center">
                             { match &self.device {
-                                DeviceState::Loaded(device) => html! { <table class="table mt-1">
+                                SvdLoadingState::Loaded(device) => html! { <table class="table mt-1">
                                     { for device.peripherals.iter().enumerate().map(|(i, peripheral)| html! {<PeripheralCard
                                         peripheral={peripheral}
-                                        collapsed=(i!=device.peripherals.len())
+                                        collapsed=i != device.peripherals.len()
                                         watch=&self.watch
                                         set=&self.set
                                     />}) }
                                 </table> },
-                                DeviceState::Failed(error) => html! { format!("Failed to load the SVG {}", error) },
-                                DeviceState::Loading => {
+                                SvdLoadingState::Failed(error) => html! { format!("Failed to load the SVG {}", error) },
+                                SvdLoadingState::Loading => {
                                     html! { <div class="d-flex flex-column align-items-center">
                                         <div class="spinner-border mb-2" role="status">
                                             <span class="visually-hidden">{ "Loading..." }</span>
