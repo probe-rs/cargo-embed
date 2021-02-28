@@ -1,4 +1,6 @@
+use log::Level;
+
 fn main() {
-    wasm_logger::init(wasm_logger::Config::default());
+    console_log::init_with_level(Level::Debug).unwrap();
     yew::start_app::<svd_viewer::Model>();
 }

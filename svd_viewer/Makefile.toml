@@ -1,11 +1,11 @@
 [tasks.build]
 command = "wasm-pack"
-args = ["build", "--dev", "--target", "web", "--out-name", "wasm", "--out-dir", "./static", "--", "--bin", "app"]
+args = ["build", "--dev", "--target", "web", "--out-name", "app", "--out-dir", "./static", "--", "--bin", "app"]
 watch = { ignore_pattern = "static/*" }
 
 [tasks.build-worker]
 command = "wasm-pack"
-args = ["build", "--dev", "--target", "no-modules", "--out-name", "wasm", "--out-dir", "./static", "--", "--bin", "worker"]
+args = ["build", "--dev", "--target", "no-modules", "--out-name", "worker", "--out-dir", "./static", "--", "--bin", "worker"]
 watch = { ignore_pattern = "static/*" }
 
 [tasks.release]
