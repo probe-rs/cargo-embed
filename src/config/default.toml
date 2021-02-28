@@ -21,6 +21,7 @@ halt_afterwards = false
 restore_unwritten_bytes = false
 # The path where an SVG of the assembled flash layout should be written to.
 # flash_layout_output_path = "out.svg"
+do_chip_erase = false
 
 [default.reset]
 # Whether or not the target should be reset.
@@ -35,16 +36,24 @@ halt_afterwards = false
 # A list of chip descriptions to be loaded during runtime.
 chip_descriptions = []
 # The default log level to be used. Possible values are one of:
-#   "OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE" 
+#   "OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
 log_level = "WARN"
+# Use this flag to assert the nreset & ntrst pins during attaching the probe to the chip.
+connect_under_reset = false
 
 [default.rtt]
 # Whether or not an RTTUI should be opened after flashing.
 # This is exclusive and cannot be used with SVD or GDB at the moment.
 enabled = false
 # A list of channel associations to be displayed. If left empty, all channels are displayed.
+# formats are: String, Defmt, BinaryLE,
 channels = [
-    # { up = 0, down = 0, name = "name" }
+    # { up = 0, down = 0, name = "name", format = "String" },
+
+    # How to enable Defmt formatting (https://github.com/knurling-rs/defmt)
+    # (formats on host, not on microcontroller)?
+    # microcontroller setup: https://github.com/knurling-rs/app-template
+    # { up = 0, name = "defmt_name", format = "Defmt" },
 ]
 # The duration in ms for which the logger should retry to attach to RTT.
 timeout = 3000
@@ -60,7 +69,7 @@ log_path = "./logs"
 # This is exclusive and cannot be used with SVD or RTT at the moment.
 enabled = false
 # The connection string in host:port format wher the GDB server will open a socket.
-# gdb_connection_string
+gdb_connection_string = "127.0.0.1:1337"
 
 [default.svd]
 # Whether or not a SVD viewer should be opened after flashing.

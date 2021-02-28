@@ -7,18 +7,19 @@ use crossterm::{
 use probe_rs_rtt::RttChannel;
 use std::io::{Read, Seek, Write};
 use std::{fmt::write, path::PathBuf};
-use textwrap::wrap_iter;
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, Paragraph, Tabs, Text},
+    text::{Span, Spans},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
     Terminal,
 };
 
-use super::channel::ChannelState;
-use super::event::{Event, Events};
-use super::DataFormat;
+use super::{
+    channel::{ChannelState, DataFormat},
+    event::{Event, Events},
+};
 
 use event::{DisableMouseCapture, KeyModifiers};
 
@@ -49,9 +50,9 @@ impl App {
         logname: String,
     ) -> Result<Self> {
         let mut tabs = Vec::new();
-        let mut up_channels = rtt.up_channels().drain().collect::<Vec<_>>();
-        let mut down_channels = rtt.down_channels().drain().collect::<Vec<_>>();
         if !config.rtt.channels.is_empty() {
+            let mut up_channels = rtt.up_channels().drain().collect::<Vec<_>>();
+            let mut down_channels = rtt.down_channels().drain().collect::<Vec<_>>();
             for channel in &config.rtt.channels {
                 tabs.push(ChannelState::new(
                     channel.up.and_then(|up| pull_channel(&mut up_channels, up)),
@@ -60,9 +61,12 @@ impl App {
                         .and_then(|down| pull_channel(&mut down_channels, down)),
                     channel.name.clone(),
                     config.rtt.show_timestamps,
+                    channel.format,
                 ))
             }
         } else {
+            let up_channels = rtt.up_channels().drain();
+            let mut down_channels = rtt.down_channels().drain().collect::<Vec<_>>();
             for channel in up_channels.into_iter() {
                 let number = channel.number();
                 tabs.push(ChannelState::new(
@@ -70,6 +74,7 @@ impl App {
                     pull_channel(&mut down_channels, number),
                     None,
                     config.rtt.show_timestamps,
+                    DataFormat::String,
                 ));
             }
 
@@ -79,13 +84,14 @@ impl App {
                     Some(channel),
                     None,
                     config.rtt.show_timestamps,
+                    DataFormat::String,
                 ));
             }
         }
 
         // Code farther down relies on tabs being configured and might panic
         // otherwise.
-        if tabs.len() == 0 {
+        if tabs.is_empty() {
             return Err(anyhow!(
                 "Failed to initialize RTT UI: No RTT channels configured"
             ));
@@ -119,7 +125,6 @@ impl App {
         Ok(Self {
             tabs,
             current_tab: 0,
-
             terminal,
             events,
             history_path,
@@ -127,9 +132,9 @@ impl App {
         })
     }
 
-    pub fn get_rtt_symbol<'b, T: Read + Seek>(file: &'b mut T) -> Option<u64> {
+    pub fn get_rtt_symbol<T: Read + Seek>(file: &mut T) -> Option<u64> {
         let mut buffer = Vec::new();
-        if let Ok(_) = file.read_to_end(&mut buffer) {
+        if file.read_to_end(&mut buffer).is_ok() {
             if let Ok(binary) = goblin::elf::Elf::parse(&buffer.as_slice()) {
                 for sym in &binary.syms {
                     if let Some(Ok(name)) = binary.strtab.get(sym.st_name) {
@@ -145,7 +150,10 @@ impl App {
         None
     }
 
-    pub fn render(&mut self) {
+    pub fn render(
+        &mut self,
+        defmt_state: &Option<(defmt_decoder::Table, Option<defmt_elf2table::Locations>)>,
+    ) {
         let input = self.current_tab().input().to_owned();
         let has_down_channel = self.current_tab().has_down_channel();
         let scroll_offset = self.current_tab().scroll_offset();
@@ -156,11 +164,10 @@ impl App {
         let mut height = 0;
         let mut messages_wrapped: Vec<String> = Vec::new();
 
-        match current_tab {
-            //String todo deal with enums instead
-            0 => {
+        match tabs[current_tab].format() {
+            DataFormat::String => {
                 self.terminal
-                    .draw(|mut f| {
+                    .draw(|f| {
                         let constraints = if has_down_channel {
                             &[
                                 Constraint::Length(1),
@@ -176,16 +183,18 @@ impl App {
                             .constraints(constraints)
                             .split(f.size());
 
-                        let tab_names = tabs.iter().map(|t| t.name()).collect::<Vec<_>>();
-                        let tabs = Tabs::default()
-                            .titles(&tab_names.as_slice())
+                        let tab_names = tabs
+                            .iter()
+                            .map(|t| Spans::from(t.name()))
+                            .collect::<Vec<_>>();
+                        let tabs = Tabs::new(tab_names)
                             .select(current_tab)
                             .style(Style::default().fg(Color::Black).bg(Color::Yellow))
                             .highlight_style(
                                 Style::default()
                                     .fg(Color::Green)
                                     .bg(Color::Yellow)
-                                    .modifier(Modifier::BOLD),
+                                    .add_modifier(Modifier::BOLD),
                             );
                         f.render_widget(tabs, chunks[0]);
 
@@ -194,28 +203,26 @@ impl App {
                         // We need to collect to generate message_num :(
                         messages_wrapped = messages
                             .iter()
-                            .map(|m| {
-                                wrap_iter(m, chunks[1].width as usize).map(|cow| cow.into_owned())
-                            })
+                            .map(|m| textwrap::wrap(m, chunks[1].width as usize))
                             .flatten()
+                            .map(|s| s.into_owned())
                             .collect();
 
                         let message_num = messages_wrapped.len();
 
-                        let messages: Vec<Text> = messages_wrapped
+                        let messages: Vec<ListItem> = messages_wrapped
                             .iter()
                             .skip(message_num - (height + scroll_offset).min(message_num))
                             .take(height)
-                            .map(|m| Text::raw(m))
+                            .map(|s| ListItem::new(vec![Spans::from(Span::raw(s))]))
                             .collect();
 
-                        let messages = List::new(messages.iter().cloned())
+                        let messages = List::new(messages.as_slice())
                             .block(Block::default().borders(Borders::NONE));
                         f.render_widget(messages, chunks[1]);
 
                         if has_down_channel {
-                            let text = [Text::raw(input.clone())];
-                            let input = Paragraph::new(text.iter())
+                            let input = Paragraph::new(Spans::from(vec![Span::raw(input.clone())]))
                                 .style(Style::default().fg(Color::Yellow).bg(Color::Blue));
                             f.render_widget(input, chunks[2]);
                         }
@@ -229,10 +236,9 @@ impl App {
                         .set_scroll_offset(message_num - height.min(message_num));
                 }
             }
-            //binary
-            _ => {
+            binle_or_defmt => {
                 self.terminal
-                    .draw(|mut f| {
+                    .draw(|f| {
                         let constraints = if has_down_channel {
                             &[
                                 Constraint::Length(1),
@@ -248,51 +254,90 @@ impl App {
                             .constraints(constraints)
                             .split(f.size());
 
-                        let tab_names = tabs.iter().map(|t| t.name()).collect::<Vec<_>>();
-                        let tabs = Tabs::default()
-                            .titles(&tab_names.as_slice())
+                        let tab_names = tabs
+                            .iter()
+                            .map(|t| Spans::from(t.name()))
+                            .collect::<Vec<_>>();
+                        let tabs = Tabs::new(tab_names)
                             .select(current_tab)
                             .style(Style::default().fg(Color::Black).bg(Color::Yellow))
                             .highlight_style(
                                 Style::default()
                                     .fg(Color::Green)
                                     .bg(Color::Yellow)
-                                    .modifier(Modifier::BOLD),
+                                    .add_modifier(Modifier::BOLD),
                             );
                         f.render_widget(tabs, chunks[0]);
 
                         height = chunks[1].height as usize;
 
-                        //probably pretty bad
-                        let data_string: String =
-                            data.iter().fold(String::new(), |mut output, byte| {
-                                let _ = write(&mut output, format_args!("{:#04x}, ", byte));
-                                output
-                            });
+                        // probably pretty bad
+                        match binle_or_defmt {
+                            DataFormat::BinaryLE => {
+                                messages_wrapped.push(data.iter().fold(
+                                    String::new(),
+                                    |mut output, byte| {
+                                        let _ = write(&mut output, format_args!("{:#04x}, ", byte));
+                                        output
+                                    },
+                                ));
+                            }
+                            DataFormat::Defmt => {
+                                let (table, locs) = defmt_state.as_ref().expect(
+                                "Running rtt in defmt mode but table or locations could not be loaded.",
+                            );
+                                let mut frames = vec![];
 
-                        // We need to collect to generate message_num :(
-                        messages_wrapped = textwrap::wrap(&data_string, chunks[1].width as usize)
-                            .iter()
-                            .cloned()
-                            .map(|cow| cow.into_owned())
-                            .collect();
+                                frames.extend_from_slice(&data);
+
+                                while let Ok((frame, consumed)) =
+                                    defmt_decoder::decode(&frames, table)
+                                {
+                                    // NOTE(`[]` indexing) all indices in `table` have already been
+                                    // verified to exist in the `locs` map.
+                                    let loc = locs.as_ref().map(|locs| &locs[&frame.index()]);
+
+                                    messages_wrapped.push(format!("{}", frame.display(false)));
+                                    if let Some(loc) = loc {
+                                        let relpath = if let Ok(relpath) =
+                                            loc.file.strip_prefix(&std::env::current_dir().unwrap())
+                                        {
+                                            relpath
+                                        } else {
+                                            // not relative; use full path
+                                            &loc.file
+                                        };
+
+                                        messages_wrapped.push(format!(
+                                            "└─ {}:{}",
+                                            relpath.display(),
+                                            loc.line
+                                        ));
+                                    }
+
+                                    let num_frames = frames.len();
+                                    frames.rotate_left(consumed);
+                                    frames.truncate(num_frames - consumed);
+                                }
+                            }
+                            DataFormat::String => unreachable!("You encountered a bug. Please open an issue on Github."),
+                        }
 
                         let message_num = messages_wrapped.len();
 
-                        let messages: Vec<Text> = messages_wrapped
+                        let messages: Vec<ListItem> = messages_wrapped
                             .iter()
                             .skip(message_num - (height + scroll_offset).min(message_num))
                             .take(height)
-                            .map(|m| Text::raw(m))
+                            .map(|s| ListItem::new(vec![Spans::from(Span::raw(s))]))
                             .collect();
 
-                        let messages = List::new(messages.iter().cloned())
+                        let messages = List::new(messages.as_slice())
                             .block(Block::default().borders(Borders::NONE));
                         f.render_widget(messages, chunks[1]);
 
                         if has_down_channel {
-                            let text = [Text::raw(input.clone())];
-                            let input = Paragraph::new(text.iter())
+                            let input = Paragraph::new(Spans::from(vec![Span::raw(input.clone())]))
                                 .style(Style::default().fg(Color::Yellow).bg(Color::Blue));
                             f.render_widget(input, chunks[2]);
                         }
@@ -319,20 +364,21 @@ impl App {
 
                     if let Some(path) = &self.history_path {
                         for (i, tab) in self.tabs.iter().enumerate() {
-                            // todo dont hardcode DataFormat, take from config
-                            let extension = match i {
-                                0 => "txt",
-                                _ => "dat",
+                            let extension = match tab.format() {
+                                DataFormat::String => "txt",
+                                DataFormat::BinaryLE => "dat",
+                                DataFormat::Defmt => {
+                                    panic!("You encountered a bug. Please open an issue on Github.")
+                                }
                             };
 
                             let name = format!("{}_channel{}.{}", self.logname, i, extension);
                             let final_path = path.join(name);
 
-                            match std::fs::File::create(final_path.clone()) {
+                            match std::fs::File::create(&final_path) {
                                 Ok(mut file) => {
-                                    match i {
-                                        //string, take from config and store and match the enum
-                                        0 => {
+                                    match tab.format() {
+                                        DataFormat::String => {
                                             for line in tab.messages() {
                                                 match writeln!(file, "{}", line) {
                                                     Ok(_) => {}
@@ -346,10 +392,7 @@ impl App {
                                                 }
                                             }
                                         }
-                                        //binary
-                                        //todo formatting into like f32s and then back to u8?
-                                        //to presuambly maintian endianness?
-                                        _ => match file.write(&tab.data()) {
+                                        DataFormat::BinaryLE => match file.write(&tab.data()) {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 eprintln!(
@@ -359,12 +402,20 @@ impl App {
                                                 continue;
                                             }
                                         },
+                                        DataFormat::Defmt => {
+                                            log::error!("Cannot write defmt output to disk.")
+                                        }
                                     };
+
+                                    // Flush file
+                                    if let Err(e) = file.flush() {
+                                        eprintln!("Error writing log channel {}: {}", i, e)
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!(
-                                        "\nCould not create log file {:?}: {}",
-                                        final_path.clone(),
+                                        "\nCould not create log file {}: {}",
+                                        final_path.display(),
                                         e
                                     );
                                 }
@@ -416,13 +467,8 @@ impl App {
 
     /// Polls the RTT target for new data on all channels.
     pub fn poll_rtt(&mut self) {
-        for (i, channel) in self.tabs.iter_mut().enumerate() {
-            //for now, just assume 0 is string everything else is binaryle
-            let fmt = match i {
-                0 => DataFormat::String,
-                _ => DataFormat::BinaryLE,
-            };
-            channel.poll_rtt(fmt);
+        for channel in self.tabs.iter_mut() {
+            channel.poll_rtt();
         }
     }
 

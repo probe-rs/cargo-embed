@@ -43,6 +43,7 @@ pub struct Flashing {
     pub halt_afterwards: bool,
     pub restore_unwritten_bytes: bool,
     pub flash_layout_output_path: Option<String>,
+    pub do_chip_erase: bool,
 }
 
 /// The reset config struct holding all the possible reset options.
@@ -59,6 +60,8 @@ pub struct General {
     pub chip_descriptions: Vec<String>,
     pub log_level: log::Level,
     pub derives: Option<String>,
+    /// Use this flag to assert the nreset & ntrst pins during attaching the probe to the chip.
+    pub connect_under_reset: bool,
 }
 
 /// The rtt config struct holding all the possible rtt options.
@@ -92,7 +95,7 @@ pub struct SvdView {
 }
 
 impl Configs {
-    pub fn new(name: impl AsRef<str>) -> anyhow::Result<Config> {
+    pub fn try_new(name: impl AsRef<str>) -> anyhow::Result<Config> {
         let mut s = config::Config::new();
 
         // Start off by merging in the default configuration file.
@@ -180,6 +183,6 @@ mod test {
     fn default_config() {
         // Ensure the default config can be parsed.
 
-        let _config = Configs::new("default").unwrap();
+        let _config = Configs::try_new("default").unwrap();
     }
 }

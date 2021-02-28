@@ -1,18 +1,14 @@
 mod config;
 mod error;
-mod helpers;
-mod logging;
 mod rttui;
 mod svd_viewer;
-
-use structopt;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Local;
 use colored::*;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::{
-    env,
+    env, fs,
     fs::File,
     io::Write,
     iter, panic,
@@ -28,13 +24,41 @@ use probe_rs::{
     flashing::{download_file_with_options, DownloadOptions, FlashProgress, Format, ProgressEvent},
     DebugProbeSelector, Probe,
 };
-use probe_rs_cli_util::build_artifact;
+#[cfg(feature = "sentry")]
+use probe_rs_cli_util::logging::{ask_to_log_crash, capture_anyhow, capture_panic};
+use probe_rs_cli_util::{argument_handling, build_artifact, logging, logging::Metadata};
 use probe_rs_rtt::{Rtt, ScanRegion};
+
+use crate::rttui::channel::DataFormat;
+
+lazy_static::lazy_static! {
+    static ref METADATA: Arc<Mutex<Metadata>> = Arc::new(Mutex::new(Metadata {
+        release: CARGO_VERSION.to_string(),
+        chip: None,
+        probe: None,
+        speed: None,
+        commit: GIT_VERSION.to_string()
+    }));
+}
+
+const CARGO_NAME: &str = env!("CARGO_PKG_NAME");
+const CARGO_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_VERSION: &str = git_version::git_version!(fallback = "crates.io");
 
 #[derive(Debug, StructOpt)]
 struct Opt {
+    #[structopt(short = "V", long = "version")]
+    pub version: bool,
     #[structopt(name = "config")]
     config: Option<String>,
+    #[structopt(name = "chip", long = "chip")]
+    chip: Option<String>,
+    #[structopt(
+        long = "probe",
+        help = "Use this flag to select a specific probe in the list.\n\
+        Use '--probe VID:PID' or '--probe VID:PID:Serial' if you have more than one probe with the same VID:PID."
+    )]
+    probe_selector: Option<DebugProbeSelector>,
     #[structopt(name = "list-chips", long = "list-chips")]
     list_chips: bool,
     #[structopt(name = "disable-progressbars", long = "disable-progressbars")]
@@ -61,9 +85,20 @@ struct Opt {
     features: Vec<String>,
 }
 
-const ARGUMENTS_TO_REMOVE: &[&str] = &["list-chips", "disable-progressbars"];
+const ARGUMENTS_TO_REMOVE: &[&str] = &["list-chips", "disable-progressbars", "chip=", "probe="];
 
 fn main() {
+    let next = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        #[cfg(feature = "sentry")]
+        if ask_to_log_crash() {
+            capture_panic(&METADATA.lock().unwrap(), &info)
+        }
+        #[cfg(not(feature = "sentry"))]
+        log::info!("{:#?}", &METADATA.lock().unwrap());
+        next(info);
+    }));
+
     match main_try() {
         Ok(_) => (),
         Err(e) => {
@@ -96,6 +131,13 @@ fn main() {
 
             let _ = stderr.flush();
 
+            #[cfg(feature = "sentry")]
+            if ask_to_log_crash() {
+                capture_anyhow(&METADATA.lock().unwrap(), &e)
+            }
+            #[cfg(not(feature = "sentry"))]
+            log::info!("{:#?}", &METADATA.lock().unwrap());
+
             process::exit(1);
         }
     }
@@ -115,18 +157,26 @@ fn main_try() -> Result<()> {
     // Get commandline options.
     let opt = Opt::from_iter(&args);
 
+    if opt.version {
+        println!(
+            "{} {}\ngit commit: {}",
+            CARGO_NAME, CARGO_VERSION, GIT_VERSION
+        );
+        return Ok(());
+    }
+
     let work_dir = std::env::current_dir()?;
 
     // Get the config.
-    let config_name = opt.config.as_deref().unwrap_or_else(|| "default");
-    let config = config::Configs::new(config_name)
+    let config_name = opt.config.as_deref().unwrap_or("default");
+    let config = config::Configs::try_new(config_name)
         .with_context(|| format!("The config '{}' could not be loaded.", config_name))?;
 
     logging::init(Some(config.general.log_level));
 
     // Make sure we load the config given in the cli parameters.
     for cdp in &config.general.chip_descriptions {
-        probe_rs::config::registry::add_target_from_yaml(&Path::new(cdp))
+        probe_rs::config::add_target_from_yaml(&Path::new(cdp))
             .with_context(|| format!("failed to load the chip description from {}", cdp))?;
     }
 
@@ -134,19 +184,19 @@ fn main_try() -> Result<()> {
         print_families()?;
         std::process::exit(0);
     } else {
-        config
-            .general
-            .chip
-            .as_ref()
+        opt.chip
+            .or_else(|| config.general.chip.clone())
             .map(|chip| chip.into())
             .unwrap_or(TargetSelector::Auto)
     };
+
+    METADATA.lock().unwrap().chip = Some(format!("{:?}", chip));
 
     // Remove executable name from the arguments list.
     args.remove(0);
 
     // Remove all arguments that `cargo build` does not understand.
-    helpers::remove_arguments(ARGUMENTS_TO_REMOVE, &mut args);
+    argument_handling::remove_arguments(ARGUMENTS_TO_REMOVE, &mut args);
 
     if let Some(index) = args.iter().position(|x| x == config_name) {
         // We remove the argument we found.
@@ -156,10 +206,12 @@ fn main_try() -> Result<()> {
     let path = build_artifact(&work_dir, &args)?;
 
     // Get the binary name (without extension) from the build artifact path
-    let name = path.file_stem().and_then(|f| f.to_str()).ok_or(anyhow!(
-        "Unable to determine binary file name from path {}",
-        path.display()
-    ))?;
+    let name = path.file_stem().and_then(|f| f.to_str()).ok_or_else(|| {
+        anyhow!(
+            "Unable to determine binary file name from path {}",
+            path.display()
+        )
+    })?;
 
     logging::println(format!("      {} {}", "Config".green().bold(), config_name));
     logging::println(format!(
@@ -169,34 +221,50 @@ fn main_try() -> Result<()> {
     ));
 
     // If we got a probe selector in the config, open the probe matching the selector if possible.
-    let mut probe = match (config.probe.usb_vid.as_ref(), config.probe.usb_pid.as_ref()) {
-        (Some(vid), Some(pid)) => {
-            let selector = DebugProbeSelector {
-                vendor_id: u16::from_str_radix(vid, 16)?,
-                product_id: u16::from_str_radix(pid, 16)?,
-                serial_number: config.probe.serial.clone(),
-            };
-            Probe::open(selector)?
-        }
-        _ => {
-            if let Some(_) = config.probe.usb_vid {
-                log::warn!("USB VID ignored, because PID is not specified.");
+    let mut probe = if let Some(selector) = opt.probe_selector {
+        Probe::open(selector)?
+    } else {
+        match (config.probe.usb_vid.as_ref(), config.probe.usb_pid.as_ref()) {
+            (Some(vid), Some(pid)) => {
+                let selector = DebugProbeSelector {
+                    vendor_id: u16::from_str_radix(vid, 16)?,
+                    product_id: u16::from_str_radix(pid, 16)?,
+                    serial_number: config.probe.serial.clone(),
+                };
+                // if two probes with the same VID:PID pair exist we just choose one
+                Probe::open(selector)?
             }
-            if let Some(_) = config.probe.usb_pid {
-                log::warn!("USB PID ignored, because VID is not specified.");
-            }
+            _ => {
+                if config.probe.usb_vid.is_some() {
+                    log::warn!("USB VID ignored, because PID is not specified.");
+                }
+                if config.probe.usb_pid.is_some() {
+                    log::warn!("USB PID ignored, because VID is not specified.");
+                }
 
-            // Only automatically select a probe if there is only
-            // a single probe detected.
-            let list = Probe::list_all();
-            if list.len() > 1 {
-                return Err(anyhow!("More than a single probe detected. Use the --probe-selector argument to select which probe to use."));
+                // Only automatically select a probe if there is only
+                // a single probe detected.
+                let list = Probe::list_all();
+                if list.len() > 1 {
+                    return Err(anyhow!("The following devices were found:\n \
+                                    {} \
+                                        \
+                                    Use '--probe VID:PID'\n \
+                                                            \
+                                    You can also set the [default.probe] config attribute \
+                                    (in your Embed.toml) to select which probe to use. \
+                                    For usage examples see https://github.com/probe-rs/cargo-embed/blob/master/src/config/default.toml .",
+                                    list.iter().enumerate().map(|(num, link)| format!("[{}]: {:?}\n", num, link)).collect::<String>()));
+                }
+                Probe::open(
+                    list.first()
+                        .map(|info| {
+                            METADATA.lock().unwrap().probe = Some(format!("{:?}", info.probe_type));
+                            info
+                        })
+                        .ok_or_else(|| anyhow!("No supported probe was found"))?,
+                )?
             }
-
-            Probe::open(
-                list.first()
-                    .ok_or_else(|| anyhow!("No supported probe was found"))?,
-            )?
         }
     };
 
@@ -220,9 +288,28 @@ fn main_try() -> Result<()> {
         probe.speed_khz()
     };
 
+    METADATA.lock().unwrap().speed = Some(format!("{:?}", protocol_speed));
+
     log::info!("Protocol speed {} kHz", protocol_speed);
 
-    let mut session = probe.attach(chip).context("failed attaching to target")?;
+    let mut session = if config.general.connect_under_reset {
+        probe
+            .attach_under_reset(chip)
+            .context("failed attaching to target")?
+    } else {
+        let potential_session = probe.attach(chip);
+        match potential_session {
+            Ok(session) => session,
+            Err(err) => {
+                log::info!("The target seems to be unable to be attached to.");
+                log::info!(
+                    "A hard reset during attaching might help. This will reset the entire chip."
+                );
+                log::info!("Set `general.connect_under_reset` in your cargo-embed configuration file to enable this feature.");
+                return Err(err).context("failed attaching to target");
+            }
+        }
+    };
 
     if config.flashing.enabled {
         // Start timer.
@@ -343,11 +430,13 @@ fn main_try() -> Result<()> {
 
             download_file_with_options(
                 &mut session,
-                path.as_path(),
+                &path,
                 Format::Elf,
                 DownloadOptions {
                     progress: Some(&progress),
                     keep_unwritten_bytes: config.flashing.restore_unwritten_bytes,
+                    do_chip_erase: config.flashing.do_chip_erase,
+                    dry_run: false,
                 },
             )
             .with_context(|| format!("failed to flash {}", path.display()))?;
@@ -361,11 +450,13 @@ fn main_try() -> Result<()> {
         } else {
             download_file_with_options(
                 &mut session,
-                path.as_path(),
+                &path,
                 Format::Elf,
                 DownloadOptions {
                     progress: None,
                     keep_unwritten_bytes: config.flashing.restore_unwritten_bytes,
+                    do_chip_erase: config.flashing.do_chip_erase,
+                    dry_run: false,
                 },
             )
             .with_context(|| format!("failed to flash {}", path.display()))?;
@@ -397,33 +488,54 @@ fn main_try() -> Result<()> {
         }
     }
 
-    if [config.gdb.enabled, config.rtt.enabled, config.svd.enabled]
-        .iter()
-        .fold(0, |c, v| c + if *v { 1 } else { 0 })
-        > 1
-    {
-        return Err(anyhow!(
-            "Unfortunately, at the moment, only GDB OR RTT OR SVD are possible."
-        ));
-    }
+    let session = Arc::new(Mutex::new(session));
 
+    let mut gdb_thread_handle = None;
     if config.gdb.enabled {
-        let gdb_connection_string = config
-            .gdb
-            .gdb_connection_string
-            .as_deref()
-            .or_else(|| Some("localhost:1337"));
-        // This next unwrap will always resolve as the connection string is always Some(T).
-        logging::println(format!(
-            "Firing up GDB stub at {}.",
-            gdb_connection_string.as_ref().unwrap(),
-        ));
-        if let Err(e) = probe_rs_gdb_server::run(gdb_connection_string, session) {
-            logging::eprintln("During the execution of GDB an error was encountered:");
-            logging::eprintln(format!("{:?}", e));
-        }
-    } else if config.rtt.enabled {
-        let session = Arc::new(Mutex::new(session));
+        let gdb_connection_string = config.gdb.gdb_connection_string.clone();
+        let session = session.clone();
+        gdb_thread_handle = Some(std::thread::spawn(move || {
+            let gdb_connection_string = gdb_connection_string.as_deref().or(Some("127.0.0.1:1337"));
+            // This next unwrap will always resolve as the connection string is always Some(T).
+            log::info!(
+                "Firing up GDB stub at {}.",
+                gdb_connection_string.as_ref().unwrap(),
+            );
+            if let Err(e) = probe_rs_gdb_server::run(gdb_connection_string, &session) {
+                logging::eprintln("During the execution of GDB an error was encountered:");
+                logging::eprintln(format!("{:?}", e));
+            }
+        }));
+    }
+    if config.rtt.enabled {
+        let defmt_enable = config
+            .rtt
+            .channels
+            .iter()
+            .any(|elem| elem.format == DataFormat::Defmt);
+        let defmt_state = if defmt_enable {
+            let elf = fs::read(path.clone()).unwrap();
+            let table = defmt_elf2table::parse(&elf)?;
+
+            let locs = {
+                let table = table.as_ref().unwrap();
+                let locs = defmt_elf2table::get_locations(&elf, &table)?;
+
+                if !table.is_empty() && locs.is_empty() {
+                    log::warn!("Insufficient DWARF info; compile your program with `debug = 2` to enable location info.");
+                    None
+                } else if table.indices().all(|idx| locs.contains_key(&(idx as u64))) {
+                    Some(locs)
+                } else {
+                    log::warn!("Location info is incomplete; it will be omitted from the output.");
+                    None
+                }
+            };
+            Some((table.unwrap(), locs))
+        } else {
+            None
+        };
+
         let t = std::time::Instant::now();
         let mut error = None;
 
@@ -468,11 +580,12 @@ fn main_try() -> Result<()> {
                     let mut app = rttui::app::App::new(rtt, &config, logname)?;
                     loop {
                         app.poll_rtt();
-                        app.render();
+                        app.render(&defmt_state);
                         if app.handle_event() {
                             logging::println("Shutting down.");
                             return Ok(());
                         };
+                        std::thread::sleep(Duration::from_millis(10));
                     }
                 }
                 Err(err) => {
@@ -487,10 +600,14 @@ fn main_try() -> Result<()> {
         }
     } else if config.svd.enabled {
         svd_viewer::server::run(&config);
-        if let Err(e) = svd_viewer::runner::run(Arc::new(Mutex::new(session)), &config) {
+        if let Err(e) = svd_viewer::runner::run(session, &config) {
             logging::eprintln("During the execution of the SVD viewer an error was encountered:");
             logging::eprintln(format!("{:?}", e));
         }
+    }
+
+    if let Some(gdb_thread_handle) = gdb_thread_handle {
+        let _ = gdb_thread_handle.join();
     }
 
     logging::println(format!(
@@ -504,8 +621,8 @@ fn main_try() -> Result<()> {
 
 fn print_families() -> Result<()> {
     logging::println("Available chips:");
-    for family in probe_rs::config::registry::families()
-        .map_err(|e| anyhow!("Families could not be read: {:?}", e))?
+    for family in
+        probe_rs::config::families().map_err(|e| anyhow!("Families could not be read: {:?}", e))?
     {
         logging::println(&family.name);
         logging::println("    Variants:");

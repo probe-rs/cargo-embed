@@ -11,7 +11,6 @@ use crate::config::Config;
 
 pub fn run(session: Arc<Mutex<Session>>, config: &Config) -> Result<(), Error> {
     let mut watch = Vec::new();
-    let mut update_interval: u64 = 5000;
 
     let mut websockets: UpdaterChannel<Command, Update> =
         WebsocketUpdater::new(&config.svd.websocket_server).start();
@@ -19,44 +18,47 @@ pub fn run(session: Arc<Mutex<Session>>, config: &Config) -> Result<(), Error> {
     let mut timestamp = std::time::Instant::now();
 
     loop {
-        let elapsed = timestamp.elapsed();
-        if elapsed.as_millis() > update_interval as u128 {
-            timestamp = std::time::Instant::now();
-            match websockets.rx().try_recv() {
-                Ok(command) => {
-                    log::info!("Got backend command message: {:?}", command);
+        match websockets.rx().try_recv() {
+            Ok(command) => {
+                log::info!("Got backend command message: {:?}", command);
 
-                    match command {
-                        Command::UpdateInterval(interval) => update_interval = interval as u64,
-                        Command::Watch(watch_registers) => {
-                            watch = watch_registers
-                                .into_iter()
-                                .map(|address| Register { address, value: 0 })
-                                .collect()
+                match command {
+                    Command::Watch(watch_registers) => {
+                        watch = watch_registers
+                            .into_iter()
+                            .map(|address| Register { address, value: 0 })
+                            .collect()
+                    }
+                    Command::SetRegister(register) => {
+                        let mut session = session.lock().unwrap();
+
+                        let mut core = session.core(0)?;
+                        core.write_word_32(register.address, register.value)?;
+                    }
+                    Command::Halt => {
+                        let mut session = session.lock().unwrap();
+
+                        let mut core = session.core(0)?;
+                        core.halt(Duration::from_millis(1000))?;
+                        for register in &mut watch {
+                            register.value = core.read_word_32(register.address)?;
                         }
-                        Command::SetRegister(register) => {
-                            let mut session = session.lock().unwrap();
 
-                            let mut core = session.core(0)?;
-                            core.write_word_32(register.address, register.value)?;
-                        }
-                    };
-                }
-                _ => (),
+                        let _ = websockets.tx().send(Update::Halted);
+                        let _ = websockets.tx().send(Update::Registers(Registers {
+                            registers: watch.clone(),
+                        }));
+                    }
+                    Command::Run => {
+                        let mut session = session.lock().unwrap();
+
+                        let mut core = session.core(0)?;
+                        core.run()?;
+                        let _ = websockets.tx().send(Update::Running);
+                    }
+                };
             }
-
-            let mut session = session.lock().unwrap();
-            for register in &mut watch {
-                let mut core = session.core(0)?;
-                register.value = core.read_word_32(register.address)?;
-            }
-
-            let _ = websockets.tx().send(Update::Registers(Registers {
-                registers: watch.clone(),
-            }));
-
-            let remaining = Duration::from_millis(update_interval) - timestamp.elapsed();
-            std::thread::sleep(remaining);
+            _ => (),
         }
     }
 }

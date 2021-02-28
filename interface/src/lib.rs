@@ -20,7 +20,6 @@ pub enum Update {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
-    UpdateInterval(usize),
     Watch(Vec<u32>),
     SetRegister(Register),
     Halt,
