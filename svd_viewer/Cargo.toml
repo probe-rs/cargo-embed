@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 yew = "0.17.3"
 wasm-bindgen = "0.2"
-svd-parser = "0.9.0"
+svd-parser = { version = "0.9.0", features = ["serde"] }
 js-sys = "0.3"
 log = "0.4.11"
 console_log = { version = "0.2", features = ["color"] }
@@ -18,3 +18,5 @@ interface = { path = "../interface" }
 serde_json = { version = "1.0.51" }
 anyhow = "1.0.32"
 yewtil = "0.3.1"
+serde = "1.0.0"
+wasm-logger = "0.2"

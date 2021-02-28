@@ -103,7 +103,7 @@ fn action_view(field: &FieldElement) -> VNode {
     if field.props.enumerated_values.len() > 1 {
         if let Some(br) = field.props.bit_range {
             if br.msb() - br.lsb() == 0 {
-                log::info!("{:?}", field.props.enumerated_values);
+                // log::info!("{:?}", field.props.enumerated_values);
                 let read = field
                     .props
                     .enumerated_values

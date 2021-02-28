@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use svd_parser::{AddressBlock, Cpu, Field, Interrupt, RegisterProperties};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Device {
     pub name: String,
     pub version: Option<String>,
@@ -39,7 +40,7 @@ impl From<svd_parser::Device> for Device {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Peripheral {
     pub name: String,
     pub version: Option<String>,
@@ -92,7 +93,7 @@ impl From<svd_parser::Peripheral> for Peripheral {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Register {
     pub name: String,
     pub description: Option<String>,
