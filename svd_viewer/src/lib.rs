@@ -31,6 +31,7 @@ pub struct Model {
     watch: Callback<u32>,
     set: Callback<(u32, u32)>,
     loader: Box<dyn yew::Bridge<svd_loader::Loader>>,
+    halted: bool,
 }
 
 /// Represents a new websocket event in any form.
@@ -45,13 +46,28 @@ pub enum Msg {
     SvdFileDataLoaded(FileData),
     SvdParsingComplete(SvdLoadingState),
     UserSelectedFiles(File),
-    UpdatePollInterval(usize),
     Search(String),
     WebSocketData(Update),
     WebsocketEvent(WebsocketEvent),
     Watch(u32),
     Set((u32, u32)),
+    Halt,
     None,
+}
+
+impl Model {
+    fn request_halt(&mut self) {
+        self.send_request(&Command::Halt);
+    }
+
+    fn request_run(&mut self) {
+        self.send_request(&Command::Run);
+    }
+
+    fn send_request(&mut self, command: &Command) {
+        let data = serde_json::to_string(command).unwrap();
+        self.websocket_task.as_mut().unwrap().send(Ok(data));
+    }
 }
 
 impl Component for Model {
@@ -96,6 +112,7 @@ impl Component for Model {
             watch,
             set,
             loader,
+            halted: false,
         }
     }
 
@@ -121,7 +138,6 @@ impl Component for Model {
                 let task = ReaderService::read_file(file, callback).unwrap();
                 self.reader_tasks.push(task);
             }
-            Msg::UpdatePollInterval(ms) => self.poll_interval = ms,
             Msg::Search(term) => {
                 if let SvdLoadingState::Loaded(device) = &mut self.device {
                     log::debug!("HEHE");
@@ -171,6 +187,14 @@ impl Component for Model {
                                 }
                             }
                         }
+                    }
+                    Update::Halted => {
+                        self.halted = true;
+                        return true;
+                    }
+                    Update::Running => {
+                        self.halted = false;
+                        return true;
                     }
                 }
                 return false;
@@ -230,6 +254,13 @@ impl Component for Model {
                 let data = serde_json::to_string(&command).unwrap();
                 self.websocket_task.as_mut().unwrap().send(Ok(data));
             }
+            Msg::Halt => {
+                if self.halted {
+                    self.request_run();
+                } else {
+                    self.request_halt();
+                }
+            }
             Msg::None => return false,
         }
         true
@@ -243,7 +274,7 @@ impl Component for Model {
         html! {
             <>
                 <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                    <div class="collapse navbar-collapse" id="navbar">
+                    <div class="container-fluid">
                         <ul class="navbar-nav mr-auto">
                             <li class="nav-item">
                                 <input type="file" onchange=self.link.callback(move |value| {
@@ -258,23 +289,28 @@ impl Component for Model {
                                     }
                                 })/>
                             </li>
-                            <li>
-                                <input
-                                    class="form-control mr-sm-2"
-                                    type="text"
-                                    placeholder="Update Interval"
-                                    aria-label="Update Interval"
-                                    oninput=self.link.callback(move |value: InputData| {
-                                        if let Ok(value) = value.value.parse::<usize>() {
-                                            Msg::UpdatePollInterval(value)
-                                        } else {
-                                            Msg::None
-                                        }
-                                    })
-                                    value=self.poll_interval
-                                />
-                            </li>
                         </ul>
+
+                        <ul class="navbar-nav mr-auto">
+                            <li>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                >
+                                    { if self.halted { html! {
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-circle-fill" viewBox="0 0 16 16">
+                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814l-3.5-2.5z"/>
+                                        </svg>
+                                    }} else { html! {
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-circle-fill" viewBox="0 0 16 16">
+                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.25 5C5.56 5 5 5.56 5 6.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C7.5 5.56 6.94 5 6.25 5zm3.5 0c-.69 0-1.25.56-1.25 1.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C11 5.56 10.44 5 9.75 5z"/>
+                                        </svg>
+                                    }}}
+                                </button>
+                            </li>
+
+                        </ul>
+
                         <form class="my-2 my-lg-0 d-flex">
                             <input
                                 class="form-control mr-sm-2"
@@ -322,8 +358,3 @@ impl Component for Model {
         }
     }
 }
-// #[wasm_bindgen(start)]
-// pub fn run_app() {
-//     console_log::init_with_level(Level::Debug).unwrap();
-//     yew::start_app::<Model>();
-// }

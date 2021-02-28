@@ -14,6 +14,8 @@ pub struct Registers {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Update {
     Registers(Registers),
+    Halted,
+    Running,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,4 +23,6 @@ pub enum Command {
     UpdateInterval(usize),
     Watch(Vec<u32>),
     SetRegister(Register),
+    Halt,
+    Run,
 }
