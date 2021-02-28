@@ -56,66 +56,74 @@ impl Component for RegisterElement {
     }
 
     fn view(&self) -> Html {
-        html! { <>
-            <tr style="border-top: 4px solid black;">
-                <FieldElement
-                    name=self.props.register.name.clone()
-                    value=self.props.register.value
-                    address=self.props.register.address
-                    set=&self.set
-                />
+        if self.watching {
+            html! { <>
+                <tr>
+                    <FieldElement
+                        name=self.props.register.name.clone()
+                        value=self.props.register.value
+                        address=self.props.register.address
+                        set=&self.set
+                    />
+                    <td>
+                        <button
+                            class="btn btn-outline-danger btn-watch"
+                            type="button"
+                            onclick=self.link.callback(move |_| {
+                                Msg::Watch
+                            })
+                        >
+                            { "Unwatch" }
+                        </button>
+                    </td>
+                </tr>
+
+                { self.props.register.fields.as_ref().map_or_else(
+                    || html! { },
+                    |fields| if fields.len() > 1 {
+                        html! { { for fields.iter().rev().map(|register| match &register.0 {
+                            Field::Single(info) => { html! {
+                                <tr><FieldElement
+                                    name=info.name.clone()
+                                    value=self.props.register.value
+                                    bit_range=Some(info.bit_range)
+                                    enumerated_values=info.enumerated_values.clone()
+                                    set=&self.set
+                                /></tr>
+                            } }
+                            Field::Array(info, dim) => html! { for (0..dim.dim).map(|d| {
+                                html! { <tr><FieldElement
+                                    name=info.name.clone()
+                                    offset={ dim.dim_increment * d }
+                                    index={ dim.dim_index.as_ref().map(|i| i.get(d as usize).map(Clone::clone)).flatten() }
+                                    value=self.props.register.value
+                                    bit_range=Some(info.bit_range)
+                                    enumerated_values=info.enumerated_values.clone()
+                                    set=&self.set
+                                /></tr> }
+                            }) },
+                        } ) }
+                        }
+                    } else {
+                        html! {}
+                    }
+                ) }
+            </> }
+        } else {
+            html! { <tr>
+                <td colspan="4">{ &self.props.register.name }</td>
                 <td>
                     <button
-                        class="btn btn-link btn-watch"
+                        class="btn btn-outline-primary btn-watch"
                         type="button"
                         onclick=self.link.callback(move |_| {
                             Msg::Watch
                         })
                     >
-                    { if self.watching {
-                        html! { <>
-                            <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-                            <span class="sr-only">{ "Loading..." }</span>
-                        </> }
-                        } else {
-                            html! { <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-eye-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
-                                <path fill-rule="evenodd" d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
-                            </svg> }
-                        } }
+                        { "Watch" }
                     </button>
                 </td>
-            </tr>
-            { self.props.register.fields.as_ref().map_or_else(
-                || html! { },
-                |fields| if fields.len() > 1 {
-                    html! { { for fields.iter().rev().map(|register| match register {
-                        Field::Single(info) => { html! {
-                            <tr><FieldElement
-                                name=info.name.clone()
-                                value=self.props.register.value
-                                bit_range=Some(info.bit_range)
-                                enumerated_values=info.enumerated_values.clone()
-                                set=&self.set
-                            /></tr>
-                        } }
-                        Field::Array(info, dim) => html! { for (0..dim.dim).map(|d| {
-                            html! { <tr><FieldElement
-                                name=info.name.clone()
-                                offset={ dim.dim_increment * d }
-                                index={ dim.dim_index.as_ref().map(|i| i.get(d as usize).map(Clone::clone)).flatten() }
-                                value=self.props.register.value
-                                bit_range=Some(info.bit_range)
-                                enumerated_values=info.enumerated_values.clone()
-                                set=&self.set
-                            /></tr> }
-                        }) },
-                    } ) }
-                    }
-                } else {
-                    html! {}
-                }
-            ) }
-        </> }
+            </tr> }
+        }
     }
 }

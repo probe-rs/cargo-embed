@@ -86,8 +86,9 @@ impl Component for PeripheralCard {
                     </table>
                 </td>
             </tr> }} else { html! {<tr>
-            <td colspan=5>
-            </td></tr>}}}
+                <td colspan=5>
+                </td>
+            </tr>}}}
         </> }
     }
 }

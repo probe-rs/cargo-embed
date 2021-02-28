@@ -11,6 +11,7 @@ pub struct Device {
     pub cpu: Option<Cpu>,
     pub peripherals: Vec<Peripheral>,
     pub default_register_properties: RegisterProperties,
+    pub show: bool,
 }
 
 impl From<svd_parser::Device> for Device {
@@ -36,6 +37,7 @@ impl From<svd_parser::Device> for Device {
             cpu,
             peripherals: peripherals.into_iter().map(From::from).collect(),
             default_register_properties,
+            show: true,
         }
     }
 }
@@ -54,6 +56,7 @@ pub struct Peripheral {
     /// `None` indicates that the `<registers>` node is not present
     pub registers: Vec<Register>,
     pub derived_from: Option<String>,
+    pub show: bool,
 }
 
 impl From<svd_parser::Peripheral> for Peripheral {
@@ -89,6 +92,7 @@ impl From<svd_parser::Peripheral> for Peripheral {
                 .flat_map(|registers| register_cluster_to_registers(registers, base_address))
                 .collect(),
             derived_from,
+            show: true,
         }
     }
 }
@@ -98,8 +102,9 @@ pub struct Register {
     pub name: String,
     pub description: Option<String>,
     pub address: u32,
-    pub fields: Option<Vec<Field>>,
+    pub fields: Option<Vec<(Field, bool)>>,
     pub value: u32,
+    pub show: bool,
 }
 
 fn register_info_to_register(
@@ -116,8 +121,9 @@ fn register_info_to_register(
         name: name,
         description,
         address: base_address + address_offset,
-        fields,
+        fields: fields.map(|fs| fs.into_iter().map(|f| (f, true)).collect()),
         value: 0,
+        show: true,
     }
 }
 
@@ -144,8 +150,12 @@ fn register_cluster_to_registers(
                         name: info.name.replace("%s", &index),
                         description: info.description.clone(),
                         address: base_address + offset + info.address_offset,
-                        fields: info.fields.clone(),
+                        fields: info
+                            .fields
+                            .clone()
+                            .map(|fs| fs.into_iter().map(|f| (f, true)).collect()),
                         value: 0,
+                        show: true,
                     }
                 })
                 .collect(),

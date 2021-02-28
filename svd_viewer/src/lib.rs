@@ -46,6 +46,7 @@ pub enum Msg {
     SvdParsingComplete(SvdLoadingState),
     UserSelectedFiles(File),
     UpdatePollInterval(usize),
+    Search(String),
     WebSocketData(Update),
     WebsocketEvent(WebsocketEvent),
     Watch(u32),
@@ -121,6 +122,40 @@ impl Component for Model {
                 self.reader_tasks.push(task);
             }
             Msg::UpdatePollInterval(ms) => self.poll_interval = ms,
+            Msg::Search(term) => {
+                if let SvdLoadingState::Loaded(device) = &mut self.device {
+                    log::debug!("HEHE");
+                    for peripheral in &mut device.peripherals {
+                        log::debug!("XD");
+                        peripheral.show = peripheral.name.starts_with(&term);
+
+                        let mut found_register = false;
+                        for register in &mut peripheral.registers {
+                            register.show = if register.name.starts_with(&term) {
+                                found_register = true;
+                                true
+                            } else {
+                                false
+                            };
+
+                            let mut found_field = false;
+                            if let Some(fields) = &mut register.fields {
+                                for field in fields {
+                                    field.1 = if register.name.starts_with(&term) {
+                                        found_field = true;
+                                        true
+                                    } else {
+                                        false
+                                    };
+                                }
+                            }
+                            register.show |= found_field;
+                        }
+                        peripheral.show |= found_register;
+                        log::debug!("HEHE {}", peripheral.show);
+                    }
+                }
+            }
             Msg::WebSocketData(data) => {
                 match data {
                     Update::Registers(register_updates) => {
@@ -231,17 +266,25 @@ impl Component for Model {
                                     aria-label="Update Interval"
                                     oninput=self.link.callback(move |value: InputData| {
                                         if let Ok(value) = value.value.parse::<usize>() {
-                                            return Msg::UpdatePollInterval(value);
+                                            Msg::UpdatePollInterval(value)
+                                        } else {
+                                            Msg::None
                                         }
-                                        Msg::None
                                     })
                                     value=self.poll_interval
                                 />
                             </li>
                         </ul>
                         <form class="my-2 my-lg-0 d-flex">
-                            <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search" />
-                            <button class="btn btn-outline-success my-2 my-sm-0" type="submit">{ "Search" }</button>
+                            <input
+                                class="form-control mr-sm-2"
+                                type="search"
+                                placeholder="Search"
+                                aria-label="Search"
+                                oninput=self.link.callback(move |value: InputData| {
+                                    Msg::Search(value.value)
+                                })
+                            />
                         </form>
                     </div>
                 </nav>
@@ -251,12 +294,16 @@ impl Component for Model {
                         <div class="col d-flex align-items-center justify-content-center">
                             { match &self.device {
                                 SvdLoadingState::Loaded(device) => html! { <table class="table mt-1">
-                                    { for device.peripherals.iter().enumerate().map(|(i, peripheral)| html! {<PeripheralCard
-                                        peripheral={peripheral}
-                                        collapsed=i != device.peripherals.len()
-                                        watch=&self.watch
-                                        set=&self.set
-                                    />}) }
+                                    { for device.peripherals.iter().enumerate().map(|(i, peripheral)| if peripheral.show {
+                                        html! {<PeripheralCard
+                                            peripheral={ peripheral }
+                                            collapsed=i != device.peripherals.len()
+                                            watch=&self.watch
+                                            set=&self.set
+                                        />}
+                                    } else {
+                                        html!{}
+                                    } ) }
                                 </table> },
                                 SvdLoadingState::Failed(error) => html! { format!("Failed to load the SVG {}", error) },
                                 SvdLoadingState::Loading => {
