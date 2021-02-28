@@ -74,7 +74,7 @@ impl Component for PeripheralCard {
                     <small>{"3 days ago"}</small>
                 </td>
             </tr>
-            <tr class=("collapse", if self.collapsed { "" } else { "show" })>
+            {if !self.collapsed { html! {<tr>
                 <td colspan=5>
                     <table class="table">
                     { for self.props.peripheral.registers.iter().enumerate().map(|(i, register)| html! { <RegisterElement
@@ -85,7 +85,9 @@ impl Component for PeripheralCard {
                     /> } ) }
                     </table>
                 </td>
-            </tr>
+            </tr> }} else { html! {<tr>
+            <td colspan=5>
+            </td></tr>}}}
         </> }
     }
 }
