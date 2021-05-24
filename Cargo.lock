@@ -34,6 +34,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,7 +329,7 @@ dependencies = [
  "chrono",
  "colored",
  "crossterm",
- "defmt-decoder",
+ "defmt-decoder 0.2.1",
  "defmt-elf2table",
  "env_logger",
  "figment",
@@ -417,7 +426,7 @@ version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
 dependencies = [
- "ansi_term",
+ "ansi_term 0.11.0",
  "atty",
  "bitflags",
  "strsim",
@@ -539,10 +548,32 @@ checksum = "7e9924b87090eb8bcc0069dc14d920c1f4df06780f192d29467c537d81bfb418"
 dependencies = [
  "byteorder",
  "colored",
- "defmt-parser",
+ "defmt-parser 0.1.0",
  "leb128",
  "ryu",
  "semver",
+]
+
+[[package]]
+name = "defmt-decoder"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06ded833cabdb1887278efffddec7aec4b8f4480b52d3101792edf8c43008051"
+dependencies = [
+ "ansi_term 0.12.1",
+ "anyhow",
+ "byteorder",
+ "colored",
+ "defmt-parser 0.2.1",
+ "difference",
+ "gimli 0.23.0",
+ "leb128",
+ "log",
+ "object 0.23.0",
+ "ryu",
+ "semver",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -552,7 +583,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83196e3d607ec7b5589b6dce9c523bd0779ed23364a55054f0c3987c8ccaf520"
 dependencies = [
  "anyhow",
- "defmt-decoder",
+ "defmt-decoder 0.1.4",
  "gimli 0.22.0",
  "object 0.21.1",
  "serde",
@@ -564,6 +595,18 @@ name = "defmt-parser"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812b30ff14930407c86a23e256ac050b8e6913f597adcc88e29d40517f7a16de"
+
+[[package]]
+name = "defmt-parser"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc63e313e87db4666440753288012024f117065b52e9b9f4d0d869e9fada6404"
+
+[[package]]
+name = "difference"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
 
 [[package]]
 name = "dtoa"
@@ -846,6 +889,17 @@ name = "gimli"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaf91faf136cb47367fa430cd46e37a788775e7fa104f8b4bcb3861dc389b724"
+dependencies = [
+ "fallible-iterator",
+ "indexmap",
+ "stable_deref_trait",
+]
+
+[[package]]
+name = "gimli"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6503fe142514ca4799d4c26297c4248239fe8838d827db6bd6065c6ed29a6ce"
 dependencies = [
  "fallible-iterator",
  "indexmap",
@@ -1403,6 +1457,12 @@ name = "object"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37fd5004feb2ce328a52b0b3d01dbf4ffff72583493900ed15f22d4111c51693"
+
+[[package]]
+name = "object"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a7ab5d64814df0fe4a4b5ead45ed6c5f181ee3ff04ba344313a6c80446c5d4"
 
 [[package]]
 name = "object"
