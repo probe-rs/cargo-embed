@@ -10,7 +10,7 @@ use std::{
     fs::File,
     io::Write,
     iter, panic,
-    path::{Path, PathBuf},
+    path::Path,
     process,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -26,7 +26,8 @@ use probe_rs::{
 use probe_rs_cli_util::logging::{ask_to_log_crash, capture_anyhow, capture_panic};
 
 use probe_rs_cli_util::{
-    argument_handling, build_artifact,
+    build_artifact,
+    common_options::CargoOptions,
     indicatif::{MultiProgress, ProgressBar, ProgressStyle},
     logging::{self, Metadata},
 };
@@ -67,29 +68,14 @@ struct Opt {
     list_chips: bool,
     #[structopt(name = "disable-progressbars", long = "disable-progressbars")]
     disable_progressbars: bool,
+    /// Always flash the program, even when it hasn't changed.
+    #[structopt(long)]
+    flash_when_fresh: bool,
 
     // `cargo build` arguments
-    #[structopt(name = "binary", long = "bin")]
-    bin: Option<String>,
-    #[structopt(name = "example", long = "example")]
-    example: Option<String>,
-    #[structopt(name = "package", short = "p", long = "package")]
-    package: Option<String>,
-    #[structopt(name = "release", long = "release")]
-    release: bool,
-    #[structopt(name = "target", long = "target")]
-    target: Option<String>,
-    #[structopt(name = "PATH", long = "manifest-path", parse(from_os_str))]
-    manifest_path: Option<PathBuf>,
-    #[structopt(long)]
-    no_default_features: bool,
-    #[structopt(long)]
-    all_features: bool,
-    #[structopt(long)]
-    features: Vec<String>,
+    #[structopt(flatten)]
+    cargo_options: CargoOptions,
 }
-
-const ARGUMENTS_TO_REMOVE: &[&str] = &["list-chips", "disable-progressbars", "chip=", "probe="];
 
 fn main() {
     let next = panic::take_hook();
@@ -156,10 +142,8 @@ fn main_try() -> Result<()> {
         args.next();
     }
 
-    let mut args: Vec<_> = args.collect();
-
     // Get commandline options.
-    let opt = Opt::from_iter(&args);
+    let opt = Opt::from_iter(args);
 
     if opt.version {
         println!(
@@ -196,32 +180,25 @@ fn main_try() -> Result<()> {
 
     METADATA.lock().unwrap().chip = Some(format!("{:?}", chip));
 
-    // Remove executable name from the arguments list.
-    args.remove(0);
-
-    // Remove all arguments that `cargo build` does not understand.
-    argument_handling::remove_arguments(ARGUMENTS_TO_REMOVE, &mut args);
-
-    if let Some(index) = args.iter().position(|x| x == config_name) {
-        // We remove the argument we found.
-        args.remove(index);
-    }
-
-    let path = build_artifact(&work_dir, &args)?;
+    let artifact = build_artifact(&work_dir, &opt.cargo_options.to_cargo_options())?;
 
     // Get the binary name (without extension) from the build artifact path
-    let name = path.file_stem().and_then(|f| f.to_str()).ok_or_else(|| {
-        anyhow!(
-            "Unable to determine binary file name from path {}",
-            path.display()
-        )
-    })?;
+    let name = artifact
+        .path()
+        .file_stem()
+        .and_then(|f| f.to_str())
+        .ok_or_else(|| {
+            anyhow!(
+                "Unable to determine binary file name from path {}",
+                artifact.path().display()
+            )
+        })?;
 
     logging::println(format!("      {} {}", "Config".green().bold(), config_name));
     logging::println(format!(
         "      {} {}",
         "Target".green().bold(),
-        path.display()
+        artifact.path().display()
     ));
 
     // If we got a probe selector in the config, open the probe matching the selector if possible.
@@ -315,7 +292,7 @@ fn main_try() -> Result<()> {
         }
     };
 
-    if config.flashing.enabled {
+    if config.flashing.enabled && (!artifact.fresh() || opt.flash_when_fresh) {
         // Start timer.
         let instant = Instant::now();
 
@@ -438,8 +415,8 @@ fn main_try() -> Result<()> {
             options.keep_unwritten_bytes = config.flashing.restore_unwritten_bytes;
             options.do_chip_erase = config.flashing.do_chip_erase;
 
-            download_file_with_options(&mut session, &path, Format::Elf, options)
-                .with_context(|| format!("failed to flash {}", path.display()))?;
+            download_file_with_options(&mut session, artifact.path(), Format::Elf, options)
+                .with_context(|| format!("failed to flash {}", artifact.path().display()))?;
 
             // We don't care if we cannot join this thread.
             let _ = progress_thread_handle.join();
@@ -452,8 +429,8 @@ fn main_try() -> Result<()> {
             options.keep_unwritten_bytes = config.flashing.restore_unwritten_bytes;
             options.do_chip_erase = config.flashing.do_chip_erase;
 
-            download_file_with_options(&mut session, &path, Format::Elf, options)
-                .with_context(|| format!("failed to flash {}", path.display()))?;
+            download_file_with_options(&mut session, artifact.path(), Format::Elf, options)
+                .with_context(|| format!("failed to flash {}", artifact.path().display()))?;
         }
 
         // Stop timer.
@@ -508,7 +485,7 @@ fn main_try() -> Result<()> {
             .iter()
             .any(|elem| elem.format == DataFormat::Defmt);
         let defmt_state = if defmt_enable {
-            let elf = fs::read(path.clone()).unwrap();
+            let elf = fs::read(artifact.path()).unwrap();
             let table = defmt_decoder::Table::parse(&elf)?;
 
             let locs = {
@@ -539,7 +516,7 @@ fn main_try() -> Result<()> {
             log::info!("Initializing RTT (attempt {})...", i);
             i += 1;
 
-            let rtt_header_address = if let Ok(mut file) = File::open(path.as_path()) {
+            let rtt_header_address = if let Ok(mut file) = File::open(artifact.path()) {
                 if let Some(address) = rttui::app::App::get_rtt_symbol(&mut file) {
                     ScanRegion::Exact(address as u32)
                 } else {

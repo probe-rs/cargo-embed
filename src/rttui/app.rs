@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Result};
 use crossterm::{
-    event::{self, KeyCode},
+    event::{KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
 use probe_rs_rtt::RttChannel;
 use std::{fmt::write, path::PathBuf, sync::mpsc::RecvTimeoutError};
@@ -20,12 +19,10 @@ use tui::{
     Terminal,
 };
 
-use super::{
+use crate::rttui::{
     channel::{ChannelState, DataFormat},
     event::Events,
 };
-
-use event::{DisableMouseCapture, KeyModifiers};
 
 /// App holds the state of the application
 pub struct App {
@@ -141,7 +138,7 @@ impl App {
         if file.read_to_end(&mut buffer).is_ok() {
             if let Ok(binary) = goblin::elf::Elf::parse(&buffer.as_slice()) {
                 for sym in &binary.syms {
-                    if let Some(Ok(name)) = binary.strtab.get(sym.st_name) {
+                    if let Some(name) = binary.strtab.get_at(sym.st_name) {
                         if name == "_SEGGER_RTT" {
                             return Some(sym.st_value);
                         }
