@@ -320,6 +320,26 @@ impl App {
                             DataFormat::String => unreachable!("You encountered a bug. Please open an issue on Github."),
                         }
 
+                        // for each message_wrapped, split it into lines according to termsize.size.width
+                        // then add each line to message_with_return
+                        let term_size = termsize::get();
+                        if let Some(termsize) = term_size{
+                            let mut message_with_return = Vec::new();
+                            // split each message_wrapped into lines
+                            for message in messages_wrapped.clone() {
+                                let mut message = message;
+                                while message.len() > termsize.cols as usize {
+                                    let mut line = String::new();
+                                    for _ in 0..termsize.cols as usize {
+                                        line.push(message.remove(0));
+                                    }
+                                    message_with_return.push(line);
+                                }
+                                message_with_return.push(message);
+                            }
+                            messages_wrapped = message_with_return;
+                        } 
+
                         let message_num = messages_wrapped.len();
 
                         let messages: Vec<ListItem> = messages_wrapped

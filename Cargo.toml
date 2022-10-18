@@ -41,3 +41,4 @@ anyhow = "1.0.65"
 textwrap = "0.15.1"
 defmt-decoder = { version = "0.3.3", features = ["unstable"] }
 sanitize-filename = "0.4"
+termsize = "0.1.6"

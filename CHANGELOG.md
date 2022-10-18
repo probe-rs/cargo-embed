@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- Fixed a bug where a line too long with defmt would disapear out of the terminal width
 
 ## [0.13.0]
 
